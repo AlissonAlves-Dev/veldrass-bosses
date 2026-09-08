@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#101722" />
+    <meta name="description" content="Acompanhe os bosses de Veldrass: próximos surgimentos, entrada para batalha e contagem regressiva no horário de Brasília." />
+    <meta name="color-scheme" content="dark" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/portal.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/portal-192.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>Boss Watch · Veldrass</title>
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="Boss Watch — início">
+          <span class="brand-mark" aria-hidden="true"><span></span></span>
+          <span>
+            <strong>Boss Watch · Veldrass</strong>
+            <small>Horário de Brasília</small>
+          </span>
+        </a>
+
+        <div class="clock" aria-label="Horário atual">
+          <span class="clock-dot" aria-hidden="true"></span>
+          <span id="current-date"></span>
+          <strong id="current-time">--:--:--</strong>
+        </div>
+      </header>
+
+      <section id="top" class="command-panel" aria-labelledby="next-title">
+        <div class="command-copy">
+          <p class="eyebrow">PRÓXIMO EVENTO</p>
+          <h1 id="next-title">Calculando patrulha…</h1>
+          <p id="next-meta" class="next-meta"></p>
+        </div>
+        <div class="hero-countdown">
+          <span id="hero-countdown">--:--:--</span>
+          <small id="hero-countdown-label">até surgir</small>
+        </div>
+        <div class="command-actions">
+          <button id="install-button" class="button button-muted" type="button" hidden>
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14" />
+          </svg>
+          <span>Instalar app</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="roster" aria-labelledby="roster-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">PATRULHA DA CIDADE</p>
+            <h2 id="roster-title">Ciclos dos bosses</h2>
+          </div>
+          <div class="legend" aria-label="Legenda dos estados">
+            <span><i class="legend-entry"></i> Entrada</span>
+            <span><i class="legend-battle"></i> Batalha</span>
+            <span><i class="legend-wait"></i> Aguardando</span>
+          </div>
+        </div>
+        <div id="boss-grid" class="boss-grid"></div>
+      </section>
+
+      <footer>
+        <p> Acompanhamento de bosses do <a href="https://veldrass.com" target="_blank" rel="noopener noreferrer">Veldrass</a>.</p>
+        <p>Ciclo: 10 min de entrada · 10 min de batalha · 7h50 de espera</p>
+        <p>Sem conexão com o jogo. Reinícios do servidor podem exigir ajuste.</p>
+      </footer>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-hidden="true"></div>
+    <script src="./bosses.js" defer></script>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

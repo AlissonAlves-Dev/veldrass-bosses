@@ -1,0 +1,25 @@
+{
+  "name": "Boss Watch · Veldrass",
+  "short_name": "Boss Watch",
+  "description": "Horários e contagem regressiva dos bosses de Veldrass.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090d13",
+  "theme_color": "#101722",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "./icons/portal-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/portal-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
