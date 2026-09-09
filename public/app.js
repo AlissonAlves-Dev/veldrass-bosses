@@ -210,5 +210,37 @@ if ("serviceWorker" in navigator) {
 document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
 
 createBossCards();
-render();
+
+function updateTabTitle(states, nowMs) {
+  // Encontra o boss com o próximo surgimento mais próximo.
+  const nextBoss = states.reduce((closest, current) => {
+    return current.state.nextSpawn < closest.state.nextSpawn
+      ? current
+      : closest;
+  });
+
+  const remaining = nextBoss.state.nextSpawn - nowMs;
+
+  document.title = `${formatDuration(remaining)} Boss Watch · Veldrass`;
+}
+
+function render() {
+  const now = new Date();
+  const nowMs = now.getTime();
+
+  const states = bosses.map((boss) => ({
+    boss,
+    state: getBossState(boss, nowMs)
+  }));
+
+  updateClock(now);
+
+  states.forEach(({ boss, state }) => {
+    updateCard(boss, state);
+  });
+
+  updateHero(states);
+  updateTabTitle(states, nowMs);
+}
+
 window.setInterval(render, 1000);
