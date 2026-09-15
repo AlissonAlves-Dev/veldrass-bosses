@@ -1,5 +1,8 @@
 "use strict";
 
+let serverClock = null;
+let clockSyncRunning = false;
+
 const MINUTE = 60 * 1000;
 const ENTRY_DURATION = 10 * MINUTE;
 const BATTLE_DURATION = 10 * MINUTE;
@@ -168,15 +171,6 @@ function updateClock(now) {
   document.querySelector("#current-time").textContent = timeFormatter.format(now);
 }
 
-function render() {
-  const now = new Date();
-  const nowMs = now.getTime();
-  const states = bosses.map((boss) => ({ boss, state: getBossState(boss, nowMs) }));
-  updateClock(now);
-  states.forEach(({ boss, state }) => updateCard(boss, state));
-  updateHero(states);
-}
-
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   deferredInstallPrompt = event;
@@ -247,9 +241,6 @@ function updateTabTitle(states, nowMs) {
 
   document.title = `${formatDuration(remaining)} Boss Watch · Veldrass`;
 }
-
-let serverClock = null;
-let clockSyncRunning = false;
 
 async function syncServerClock() {
   if (clockSyncRunning) return;
