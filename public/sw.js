@@ -18,6 +18,9 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  if (new URL(event.request.url).pathname === "/api/time") {
+    return;
+  }
   if (event.request.method !== "GET" || !allowed.has(event.request.url)) return;
   event.respondWith(
     (async () => {

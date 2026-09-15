@@ -207,9 +207,33 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
-
 createBossCards();
+
+document.querySelector("#next-title").textContent =
+  "Sincronizando horário…";
+
+syncServerClock();
+
+// Atualiza a tela sem consultar o servidor a cada segundo.
+window.setInterval(render, 1000);
+
+// Renova a referência a cada cinco minutos, enquanto a aba estiver visível.
+window.setInterval(() => {
+  if (!document.hidden) {
+    syncServerClock();
+  }
+}, 5 * 60 * 1000);
+
+// Ressincroniza ao retornar à aba, inclusive depois de suspensão do aparelho.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    syncServerClock();
+  }
+});
+
+window.addEventListener("online", () => {
+  syncServerClock();
+});
 
 function updateTabTitle(states, nowMs) {
   // Encontra o boss com o próximo surgimento mais próximo.
@@ -224,9 +248,75 @@ function updateTabTitle(states, nowMs) {
   document.title = `${formatDuration(remaining)} Boss Watch · Veldrass`;
 }
 
+let serverClock = null;
+let clockSyncRunning = false;
+
+async function syncServerClock() {
+  if (clockSyncRunning) return;
+
+  clockSyncRunning = true;
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch("/api/time", {
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error("Falha ao consultar a hora do servidor.");
+    }
+
+    const data = await response.json();
+
+    if (!Number.isFinite(data.timestamp)) {
+      throw new Error("Horário recebido inválido.");
+    }
+
+    serverClock = {
+      timestamp: data.timestamp,
+      receivedAt: performance.now()
+    };
+
+    render();
+  } catch (error) {
+    console.error("Falha na sincronização:", error);
+
+    if (!serverClock) {
+      document.querySelector("#current-time").textContent = "--:--:--";
+      document.querySelector("#next-title").textContent =
+        "Não foi possível sincronizar o horário.";
+      document.querySelector("#next-meta").textContent =
+        "Confira a conexão e recarregue a página.";
+      document.title = "Sem sincronização · Boss Watch · Veldrass";
+    } else {
+      showToast(
+        "Sem conexão com o servidor. Mantendo a última referência de horário."
+      );
+    }
+  } finally {
+    window.clearTimeout(timeout);
+    clockSyncRunning = false;
+  }
+}
+
+function getServerNow() {
+  if (!serverClock) return null;
+
+  const elapsed = performance.now() - serverClock.receivedAt;
+
+  return serverClock.timestamp + elapsed;
+}
+
 function render() {
-  const now = new Date();
-  const nowMs = now.getTime();
+  const nowMs = getServerNow();
+
+  // Não exibe horários calculados pelo PC enquanto aguarda o servidor.
+  if (nowMs === null) return;
+
+  const now = new Date(nowMs);
 
   const states = bosses.map((boss) => ({
     boss,
@@ -243,4 +333,3 @@ function render() {
   updateTabTitle(states, nowMs);
 }
 
-window.setInterval(render, 1000);
