@@ -1,6 +1,8 @@
 {
   "redirects": [
     { "source": "/calculadora", "destination": "/", "permanent": false },
+    { "source": "/calculadora/", "destination": "/", "permanent": false },
+    { "source": "/calculadora/index.html", "destination": "/", "permanent": false },
     { "source": "/calculadora/:path*", "destination": "/", "permanent": false }
   ],
   "headers": [
