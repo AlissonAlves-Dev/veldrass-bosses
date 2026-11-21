@@ -3,8 +3,10 @@
 Site de ferramentas para jogadores do [Veldrass](https://veldrass.com), em HTML, CSS e JavaScript puros, sem dependências.
 Não é um site oficial do jogo e não tem conexão com ele.
 
-- **Boss Watch** (`/`): horários e contagem regressiva dos world bosses, no horário de Brasília.
-- **Calculadora de farm** (`/calculadora/`): compara dois builds (atributos e marcas do Bestiário) por XP/h, ouro/h e horas por item.
+**Site no ar:** https://veldrass-tools.vercel.app
+
+- **[Boss Watch](https://veldrass-tools.vercel.app/)** (`/`): horários e contagem regressiva dos world bosses, no horário de Brasília.
+- **[Calculadora de farm](https://veldrass-tools.vercel.app/calculadora/)** (`/calculadora/`): compara dois builds (atributos e marcas do Bestiário) por XP/h, ouro/h e horas por item.
 
 ## 1. Rodar no seu computador
 
@@ -90,7 +92,8 @@ Corrija somente com uma nova referência real, observada no jogo.
 
 ## 5. Publicação (Vercel)
 
-O site é publicado na Vercel a partir da pasta `public/`; a função `api/time.js` vira `/api/time` automaticamente.
+O site é publicado na Vercel em https://veldrass-tools.vercel.app a partir da pasta `public/`; a função `api/time.js` vira `/api/time` automaticamente.
+O endereço antigo `veldrass-bosses.vercel.app` redireciona para o atual.
 `vercel.json` acrescenta cabeçalhos de segurança e faz `/calculadora` abrir a página da calculadora.
 O workflow antigo do GitHub Pages foi removido: o Pages não tem `/api/time`, então o site publicado por ele não conseguia sincronizar o horário.
 
