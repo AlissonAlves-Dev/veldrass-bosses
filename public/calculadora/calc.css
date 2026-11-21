@@ -1,0 +1,138 @@
+/* Calculadora de farm — usa as variáveis do tema do Boss Watch (styles.css). */
+.calc-page {
+  /* Nomes usados pelo HTML gerado em calc.js, ligados às cores do tema. */
+  --panel: var(--surface);
+  --panel2: #0e151e;
+  --tx: var(--ink);
+  --mut: var(--muted);
+  --ok: var(--entry);
+  --bad: var(--battle);
+  --acc: var(--gold-soft);
+}
+
+.calc-hero { margin-bottom: 18px; }
+.calc-hero .command-actions { grid-column: 1 / -1; }
+.calc-hero h1 { font-size: clamp(1.9rem, 4.4vw, 3rem); }
+.calc-hero .next-meta { max-width: 720px; }
+
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.calc-grid > section {
+  min-width: 0;
+  /* Tabelas largas (marcas, golpes) rolam dentro do bloco em vez de alargar a página no celular. */
+  overflow-x: auto;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(24, 35, 47, 0.92), rgba(14, 21, 30, 0.96));
+}
+
+.calc-grid > section.wide { grid-column: 1 / -1; }
+
+/* Títulos de bloco no estilo "eyebrow" do watch. */
+.calc-grid h2 {
+  margin: 0 0 12px;
+  color: var(--gold);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.calc-grid h3 {
+  margin: 18px 0 8px;
+  color: var(--gold-soft);
+  font-size: 1.02rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 96px;
+  gap: 6px 12px;
+  align-items: center;
+  margin: 6px 0;
+}
+
+.row label { color: var(--muted); font-size: 0.9rem; }
+
+.calc-page input,
+.calc-page select {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--panel2);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.calc-page input[type="number"] { text-align: right; font-variant-numeric: tabular-nums; }
+.calc-page input[type="checkbox"] { width: auto; min-height: 0; accent-color: var(--gold); }
+.calc-page input:focus-visible,
+.calc-page select:focus-visible { outline: 2px solid var(--gold-soft); outline-offset: 1px; }
+
+.hint { margin: 8px 0 0; color: #7f8e9c; font-size: 0.8rem; }
+
+.calc-grid table { width: 100%; border-collapse: collapse; }
+.calc-grid th, .calc-grid td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.calc-grid th:first-child, .calc-grid td:first-child { text-align: left; }
+.calc-grid th { color: var(--muted); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.calc-grid td.d.pos { color: var(--entry); font-weight: 700; }
+.calc-grid td.d.neg { color: var(--battle); font-weight: 700; }
+
+.tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.74rem;
+}
+
+.warn { color: #f5b7b2; font-size: 0.82rem; margin: 6px 0; }
+.good { color: var(--entry); }
+
+.pts { display: flex; justify-content: space-between; gap: 10px; margin: 10px 0; color: var(--muted); font-size: 0.88rem; }
+.pts b { color: var(--ink); }
+.pts b.warn { color: var(--battle); }
+
+.mark td { padding: 4px 4px; }
+.mark select { min-height: 32px; padding: 3px 4px; font-size: 0.8rem; }
+
+/* Card da classe (modificadores fixos com cadeado). */
+.ccard {
+  margin: 10px 0 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(214, 170, 85, 0.3);
+  border-radius: 14px;
+  background:
+    linear-gradient(120deg, rgba(214, 170, 85, 0.07), transparent 45%),
+    rgba(16, 24, 34, 0.92);
+}
+.chead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 1.15rem; font-family: Georgia, "Times New Roman", serif; }
+.ccard th, .ccard td { font-size: 0.86rem; padding: 5px 8px; }
+.ccard .sub { margin-top: 8px; color: var(--muted); font-size: 0.8rem; }
+.lock { margin-right: 5px; color: var(--gold); font-size: 0.78rem; }
+
+details summary { cursor: pointer; color: var(--gold-soft); font-weight: 700; }
+.rules td { padding: 5px 10px; font-size: 0.86rem; }
+
+@media (max-width: 760px) {
+  .calc-grid > section { padding: 18px 16px; border-radius: 14px; }
+  .row { grid-template-columns: 1fr 88px; }
+  .calc-grid th, .calc-grid td { padding: 7px 6px; font-size: 0.84rem; }
+}

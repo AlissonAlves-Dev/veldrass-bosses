@@ -26,12 +26,21 @@
           </span>
         </a>
 
+        <nav class="site-nav" aria-label="Ferramentas">
+          <a href="/" aria-current="page">Boss Watch</a>
+          <a href="/calculadora/">Calculadora de farm</a>
+        </nav>
+
         <div class="clock" aria-label="Horário atual">
           <span class="clock-dot" aria-hidden="true"></span>
           <span id="current-date"></span>
           <strong id="current-time">--:--:--</strong>
         </div>
       </header>
+
+      <p id="clock-notice" class="clock-notice" role="status" hidden>
+        Sem conexão com o servidor: os horários usam o relógio do seu aparelho e podem estar errados.
+      </p>
 
       <section id="top" class="command-panel" aria-labelledby="next-title">
         <div class="command-copy">

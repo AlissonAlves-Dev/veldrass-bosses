@@ -346,3 +346,46 @@ footer a {
 footer a:hover {
   color: var(--ink);
 }
+
+/* Navegação entre as ferramentas do site (Boss Watch e Calculadora). */
+.site-nav {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  margin-right: 14px;
+}
+
+.site-nav a {
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.site-nav a:hover { color: var(--ink); border-color: var(--line); }
+
+.site-nav a[aria-current="page"] {
+  color: var(--gold-soft);
+  border-color: rgba(214, 170, 85, 0.4);
+  background: rgba(214, 170, 85, 0.08);
+}
+
+/* Aviso quando o horário vem do aparelho e não do servidor. */
+.clock-notice {
+  margin: -14px 0 18px;
+  padding: 10px 14px;
+  border: 1px solid rgba(239, 106, 98, 0.45);
+  border-radius: 10px;
+  color: #f5b7b2;
+  background: rgba(239, 106, 98, 0.08);
+  font-size: 0.84rem;
+}
+
+@media (max-width: 760px) {
+  .topbar { flex-wrap: wrap; row-gap: 12px; }
+  .site-nav { order: 3; width: 100%; margin: 0; }
+}
