@@ -84,6 +84,8 @@ Corrija somente com uma nova referência real, observada no jogo.
 
 ## 4. Calculadora de farm
 
+> **Desativada para os usuários por enquanto.** O código continua em `public/calculadora/`, mas no site publicado `/calculadora` redireciona para `/`, o link saiu do menu e o service worker não a guarda em cache. Para reativar: restaurar o link em `public/index.html`, trocar os `redirects` do `vercel.json` pelo `rewrite` de `/calculadora` → `/calculadora/index.html` e voltar os arquivos da calculadora ao `APP_SHELL` do `public/sw.js` (subindo a versão do cache).
+
 - Compara dois cenários (A e B) para classe, atributos, marcas do Bestiário e caçada.
 - Os modificadores de classe e as regras do jogo (🔒) são fixos e congelados no código; só os dados do seu personagem são editáveis.
 - Os valores ficam salvos no navegador. "Copiar link com meus valores" gera um link com o seu cenário.
@@ -94,7 +96,7 @@ Corrija somente com uma nova referência real, observada no jogo.
 
 O site é publicado na Vercel em https://veldrass-tools.vercel.app a partir da pasta `public/`; a função `api/time.js` vira `/api/time` automaticamente.
 O endereço antigo `veldrass-bosses.vercel.app` redireciona para o atual.
-`vercel.json` acrescenta cabeçalhos de segurança e faz `/calculadora` abrir a página da calculadora.
+`vercel.json` acrescenta cabeçalhos de segurança e, enquanto a calculadora está desativada, redireciona `/calculadora` para `/`.
 O workflow antigo do GitHub Pages foi removido: o Pages não tem `/api/time`, então o site publicado por ele não conseguia sincronizar o horário.
 
 Para instalar como app (PWA) é preciso HTTPS, como na Vercel. O cache offline guarda os arquivos, mas **não** mantém o JavaScript rodando em segundo plano: navegadores e celulares podem suspender abas e atrasar temporizadores. Este código não envia notificações nem alarmes; isso exigiria um backend agendador com Web Push.
