@@ -2,12 +2,16 @@
 
 let serverClock = null;
 let clockSyncRunning = false;
+// Verdadeiro quando a primeira sincronização falha: a tela usa o relógio do aparelho, com aviso.
+let syncFailed = false;
 
 const MINUTE = 60 * 1000;
 const ENTRY_DURATION = 10 * MINUTE;
 const BATTLE_DURATION = 10 * MINUTE;
 const WAIT_DURATION = 7 * 60 * MINUTE + 50 * MINUTE;
 const CYCLE_DURATION = ENTRY_DURATION + BATTLE_DURATION + WAIT_DURATION;
+// Respostas de /api/time mais lentas que isso não substituem uma referência já obtida.
+const MAX_ROUND_TRIP = 5000;
 
 // Os dados são carregados de bosses.js antes deste arquivo.
 
@@ -96,6 +100,21 @@ function formatDuration(milliseconds) {
   return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
 }
 
+function getPriority(state) {
+  if (state.phase === "entry") return 0;
+  if (state.phase === "wait") return 1;
+  return 2;
+}
+
+// Escolhe o boss em destaque: entrada aberta primeiro, depois o que surge antes.
+// Usada pelo painel principal e pelo título da aba, para os dois mostrarem o mesmo boss.
+function pickFeatured(states) {
+  return [...states].sort((a, b) => {
+    const phaseDifference = getPriority(a.state) - getPriority(b.state);
+    return phaseDifference || a.state.remaining - b.state.remaining;
+  })[0];
+}
+
 function locationIcon() {
   return '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>';
 }
@@ -130,19 +149,8 @@ function updateCard(boss, state) {
   card.querySelector(".progress-fill").style.width = `${progress}%`;
 }
 
-function getPriority(state) {
-  if (state.phase === "entry") return 0;
-  if (state.phase === "wait") return 1;
-  return 2;
-}
-
 function updateHero(states) {
-  const selected = [...states].sort((a, b) => {
-    const phaseDifference = getPriority(a.state) - getPriority(b.state);
-    return phaseDifference || a.state.remaining - b.state.remaining;
-  })[0];
-
-  const { boss, state } = selected;
+  const { boss, state } = pickFeatured(states);
   const title = state.phase === "entry"
     ? `${boss.name} está com entrada aberta`
     : state.phase === "battle"
@@ -218,6 +226,13 @@ window.setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
+// Enquanto não houver hora do servidor, tenta de novo a cada 30 s, sem esperar os cinco minutos.
+window.setInterval(() => {
+  if (!serverClock && !document.hidden) {
+    syncServerClock();
+  }
+}, 30 * 1000);
+
 // Ressincroniza ao retornar à aba, inclusive depois de suspensão do aparelho.
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
@@ -229,17 +244,13 @@ window.addEventListener("online", () => {
   syncServerClock();
 });
 
-function updateTabTitle(states, nowMs) {
-  // Encontra o boss com o próximo surgimento mais próximo.
-  const nextBoss = states.reduce((closest, current) => {
-    return current.state.nextSpawn < closest.state.nextSpawn
-      ? current
-      : closest;
-  });
+function updateTabTitle(states) {
+  // Mesmo critério do painel principal: com uma entrada aberta, ela vem primeiro.
+  const { boss, state } = pickFeatured(states);
 
-  const remaining = nextBoss.state.nextSpawn - nowMs;
-
-  document.title = `${formatDuration(remaining)} Boss Watch · Veldrass`;
+  document.title = state.phase === "entry"
+    ? `Entrada aberta ${formatDuration(state.remaining)} · ${boss.name}`
+    : `${formatDuration(state.remaining)} Boss Watch · Veldrass`;
 }
 
 async function syncServerClock() {
@@ -251,6 +262,8 @@ async function syncServerClock() {
   const timeout = window.setTimeout(() => controller.abort(), 10000);
 
   try {
+    const sentAt = performance.now();
+
     const response = await fetch("/api/time", {
       cache: "no-store",
       signal: controller.signal
@@ -261,27 +274,38 @@ async function syncServerClock() {
     }
 
     const data = await response.json();
+    const receivedAt = performance.now();
 
     if (!Number.isFinite(data.timestamp)) {
       throw new Error("Horário recebido inválido.");
     }
 
+    // O servidor carimbou a hora em algum ponto da viagem; assumir o meio dela
+    // (metade do tempo de ida e volta) tira do relógio a latência da rede.
+    const roundTrip = receivedAt - sentAt;
+
+    // Resposta muito lenta é pouco confiável: se já há uma referência boa, mantém-na.
+    if (serverClock && roundTrip > MAX_ROUND_TRIP) {
+      return;
+    }
+
     serverClock = {
-      timestamp: data.timestamp,
-      receivedAt: performance.now()
+      timestamp: data.timestamp + roundTrip / 2,
+      receivedAt
     };
+    syncFailed = false;
 
     render();
   } catch (error) {
     console.error("Falha na sincronização:", error);
 
     if (!serverClock) {
-      document.querySelector("#current-time").textContent = "--:--:--";
-      document.querySelector("#next-title").textContent =
-        "Não foi possível sincronizar o horário.";
-      document.querySelector("#next-meta").textContent =
-        "Confira a conexão e recarregue a página.";
-      document.title = "Sem sincronização · Boss Watch · Veldrass";
+      // Sem servidor e sem referência anterior: usa o relógio do aparelho, com aviso visível.
+      if (!syncFailed) {
+        syncFailed = true;
+        showToast("Sem conexão com o servidor. Usando o horário do aparelho.");
+      }
+      render();
     } else {
       showToast(
         "Sem conexão com o servidor. Mantendo a última referência de horário."
@@ -301,11 +325,23 @@ function getServerNow() {
   return serverClock.timestamp + elapsed;
 }
 
-function render() {
-  const nowMs = getServerNow();
+function updateClockNotice(usingDeviceClock) {
+  const notice = document.querySelector("#clock-notice");
+  if (notice) notice.hidden = !usingDeviceClock;
+}
 
-  // Não exibe horários calculados pelo PC enquanto aguarda o servidor.
-  if (nowMs === null) return;
+function render() {
+  let nowMs = getServerNow();
+  const usingDeviceClock = nowMs === null && syncFailed;
+
+  // Enquanto a primeira sincronização está em andamento, não mostra nada calculado pelo PC.
+  // Se ela falhou, usa o relógio do aparelho e avisa na tela.
+  if (nowMs === null) {
+    if (!usingDeviceClock) return;
+    nowMs = Date.now();
+  }
+
+  updateClockNotice(usingDeviceClock);
 
   const now = new Date(nowMs);
 
@@ -321,6 +357,6 @@ function render() {
   });
 
   updateHero(states);
-  updateTabTitle(states, nowMs);
+  updateTabTitle(states);
 }
 
