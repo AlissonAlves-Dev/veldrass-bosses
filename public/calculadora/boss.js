@@ -38,14 +38,6 @@ function bossHitDamage(atk, dv){
   if(c.passiva.tipo==='dodge') return (1-q)*f(atk);
   return f(atk);
 }
-// Dano que o jogador recebe por hora na caçada: ataques de cada espécie por encontro × dano de um golpe (defesa com a marca da espécie, passiva e multiplicador da classe) × encontros por hora.
-function huntDamageH(sc, m){
-  let d=0;
-  Object.entries(m.r.attacksBy).forEach(([k,n])=>{ const mark=sc.marks[k]||{ds:0};
-    const dvm=Object.assign({}, m.dv, {effDef:m.dv.effDefFor(MARK.ds[mark.ds||0])});
-    d+=n*bossHitDamage(DATA.monsters[k].attack, dvm); });
-  return d*m.encH;
-}
 // Quantas comidas gastar numa luta de 10 min. Cada comida só é usada quando falta HP >= cura, então a conta é dano total ÷ cura.
 function bossFoodNeeded(bossKey, sc, n, foodKey){
   const b=BOSSES[bossKey], dv=derive(S[sc]), N=Math.max(1,Math.floor(n)||1), heal=FOODS[foodKey].heal;

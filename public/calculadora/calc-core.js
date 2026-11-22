@@ -19,7 +19,11 @@ const CLASSES = {
     passiva:{nome:'Splash mágico',chance:10,tipo:'splash',desc:'Chance de repetir o mesmo dano em todos os outros alvos vivos do encontro.'}}
 };
 function deepFreeze(o){ Object.values(o).forEach(v=>{ if(v&&typeof v==='object') deepFreeze(v); }); return Object.freeze(o); }
-[RULES,CLASSES,DATA,MARK,COST,STAGEXP].forEach(deepFreeze);
+// Pets (config/pets.php): vida = base + nível × por nível. A defesa do pet é o campo "Defesa do pet" (bônus que ele dá ao dono).
+const PETS = {none:{nome:'Sem pet',baseHp:0,hpPerLevel:0}, Uncommon:{nome:'Incomum',baseHp:80,hpPerLevel:6}, Rare:{nome:'Raro',baseHp:100,hpPerLevel:8},
+  Epic:{nome:'Épico',baseHp:120,hpPerLevel:10}, Legendary:{nome:'Lendário',baseHp:150,hpPerLevel:12}};
+const PET_HIT_CHANCE = 0.30; // chance de o pet ser atacado a cada ataque de monstro (BattleSimulationService::applyPetBattleDamage)
+[RULES,CLASSES,DATA,MARK,COST,STAGEXP,PETS].forEach(deepFreeze);
 const CLS = () => CLASSES[S.cls];
 const earned = () => Math.floor(Math.max(1,S.level)/RULES.levelsPerStep)*RULES.pointsPerStep;
 // ---------- estado ----------
@@ -29,7 +33,7 @@ const S = {
   itemsDef:175, petDef:28, shield:83, shieldBonus:0, defPct:0,
   hunt:'forgotten_keep', huntEff:17.2, potionEff:0, amuletEff:0, observedKills:191, xpGlobal:0, lootRate:1, fragments:false,
   boostMon:'', boostXp:0, boostLoot:0, target:'throne_key', horizon:8,
-  heal:70, stock:400, obsFoods:41,
+  heal:70, stock:400, obsFoods:0, petRarity:'Uncommon', petLevel:20,
   parts:{}, partsOn:{}, // detalhe por equipamento (campo → slot → valor) e quais campos estão abertos
   active:'A', // cenário ativo (o que o jogador usa hoje): base da calibração e das comparações
   A:{atk:0,def:20,hp:24,pas:0,marks:{}},
@@ -63,9 +67,45 @@ function derive(sc){
   const effDef = effDefFor(0);
   return {D,skillMult,actionMs,actionMsFor,effDefFor,wait,p,passivePct,mitig,hpBase,maxHp,effDef,eff};
 }
+// Dano de um ataque depois da defesa, igual ao BattleSimulationService::damageAfterDefense (roll em [0,1)).
+function dmgAfterDef(atk, def, roll){
+  if(atk<=0) return 0;
+  def=Math.max(0,def);
+  if(def>=atk*2) return roll<0.5?0:1;
+  if(def<atk) return Math.max(0,Math.ceil(atk-def*(0.95+roll*0.05)));
+  const prog=Math.min(1,Math.max(0,(def-atk)/Math.max(1,atk)));
+  const maxLeak=Math.max(1,Math.ceil(atk*0.05));
+  return Math.max(1,Math.ceil(roll*Math.max(1,Math.ceil(maxLeak*(1-prog)))));
+}
+// Quantas comidas são gastas com uma comida de cura `heal`: come 1 por ação, só quando falta pelo menos `heal` de HP (consumeFoodIfNeeded).
+// Usa os golpes sorteados em simulate(). Jogador: se o HP chega a 0, conta uma morte e volta ao máximo.
+// Pet: morto, não volta na mesma caçada. Por isso medimos a "vida" do pet (comidas gastas e ações até morrer) e extrapolamos em petFoodsOver().
+function countFoods(r, heal, maxHp){
+  const ev=r.ev, petMax=r.petMaxHp, n=ev.p.length; let hp=maxHp, ph=petMax, eats=0, deaths=0, petEats=0, lifeEats=0, lifeStart=0, lives=0, sumLifeEats=0, sumLifeActs=0;
+  for(let i=0;i<n;i++){
+    const q=ev.q[i];
+    if(q){ for(let j=0;j<q.length;j++){ ph-=q[j];
+      if(ph<=0){ lives++; sumLifeEats+=lifeEats; sumLifeActs+=i-lifeStart+1; ph=petMax; lifeEats=0; lifeStart=i+1; }
+      else if(heal>0&&petMax-ph>=heal){ ph=Math.min(petMax,ph+heal); petEats++; lifeEats++; } } }
+    hp-=ev.p[i];
+    if(hp<=0){ deaths++; hp=maxHp; } else if(heal>0&&maxHp-hp>=heal){ hp=Math.min(maxHp,hp+heal); eats++; }
+  }
+  return {player:eats/r.N, playerDeaths:deaths/r.N, petLives:lives, petLifeEats:lives?sumLifeEats/lives:0, petLifeActs:lives?sumLifeActs/lives:0, petEatsPerAct:n?petEats/n:0, actsPerEnc:n/r.N};
+}
+// Comidas do pet em `hours` horas de caçada, com `actsH` ações por hora. Pet morto não volta: gasta as comidas de uma vida e para.
+function petFoodsOver(cf, actsH, hours){
+  if(!cf.petLives) return {foods:cf.petEatsPerAct*actsH*hours, lifeHours:Infinity};
+  const lifeHours=cf.petLifeActs/actsH;
+  return {foods: lifeHours>=hours ? cf.petLifeEats*hours/lifeHours : cf.petLifeEats, lifeHours};
+}
 function simulate(sc, N=30000){
   const dv=derive(sc), H=DATA.hunts[S.hunt], keys=Object.keys(H.weights), tw=keys.reduce((a,k)=>a+H.weights[k],0);
   const rnd=mulberry32(20261120);
+  // Sorteios de defesa e de ataque ao pet usam outra sequência, para não mexer nos resultados de ataque/abates.
+  const rnd2=mulberry32(20261122), C=CLS(), pet=PETS[S.petRarity]||PETS.none, petOn=S.petRarity!=='none'&&S.petLevel>0&&!!PETS[S.petRarity];
+  const petMaxHp=petOn?pet.baseHp+Math.max(1,S.petLevel)*pet.hpPerLevel:0;
+  const defBy=Object.fromEntries(keys.map(k=>[k,dv.effDefFor(MARK.ds[(sc.marks[k]||{ds:0}).ds||0])]));
+  const evP=[], evQ=[]; let dmgSum=0, petDmgSum=0;
   const pick=()=>{let r=rnd()*tw;for(const k of keys){r-=H.weights[k];if(r<0)return k}return keys[keys.length-1]};
   const mk=m=>sc.marks[m]||{dmg:0,xp:0,cc:0,cd:0,ds:0,sp:0,stage:0};
   let acts=0, actSec=0, attacks=0; const atkBy=Object.fromEntries(keys.map(k=>[k,0])); const kills=Object.fromEntries(keys.map(k=>[k,0]));
@@ -82,12 +122,21 @@ function simulate(sc, N=30000){
       const dmg=isc?Math.round(dv.D*((S.critMult+S.petCritDmg)/100+MARK.cd[pm.cd]/100)):dv.D;
       if(hit) hp[i]=Math.max(0,hp[i]-Math.round(dmg*(1+MARK.dmg[pm.dmg]/100)));
       if(rnd()<dv.p){ for(let k=0;k<hp.length;k++) if(k!==i&&hp[k]>0) hp[k]=Math.max(0,hp[k]-Math.round(dmg*(1+MARK.dmg[mk(ms[k]).dmg]/100))); }
-      for(let k=0;k<hp.length;k++) if(hp[k]>0){ attacks++; atkBy[ms[k]]++; }
+      let pdmg=0, hits=null;
+      for(let k=0;k<hp.length;k++) if(hp[k]>0){
+        attacks++; atkBy[ms[k]]++;
+        const m=ms[k], atk=DATA.monsters[m].attack; let inc=atk, dodged=false;
+        if(C.passiva.tipo==='block'&&rnd2()<dv.passivePct/100) inc=Math.floor(atk*0.5);
+        else if(C.passiva.tipo==='dodge'&&rnd2()<dv.passivePct/100) dodged=true;
+        if(!dodged){ const d=dmgAfterDef(inc,defBy[m],rnd2()); if(d>0) pdmg+=Math.max(1,Math.ceil(d*C.taken)); }
+        if(petOn&&rnd2()<PET_HIT_CHANCE){ (hits||(hits=[])).push(dmgAfterDef(atk,S.petDef,rnd2())); }
+      }
+      evP.push(pdmg); evQ.push(hits); dmgSum+=pdmg; if(hits) petDmgSum+=hits.reduce((a,b)=>a+b,0);
     }
     ms.forEach(m=>kills[m]++);
   }
   const A=acts/N, killsPerEnc=Object.fromEntries(keys.map(k=>[k,kills[k]/N]));
-  return {dv, actsPerEnc:A, actSecPerEnc:actSec/N, attacksPerEnc:attacks/N, attacksBy:Object.fromEntries(keys.map(k=>[k,atkBy[k]/N])), killsPerEnc};
+  return {dv, actsPerEnc:A, actSecPerEnc:actSec/N, N, ev:{p:evP,q:evQ}, petMaxHp, dmgPerEnc:dmgSum/N, petDmgPerEnc:petDmgSum/N, attacksPerEnc:attacks/N, attacksBy:Object.fromEntries(keys.map(k=>[k,atkBy[k]/N])), killsPerEnc};
 }
 function metrics(sc, overhead){
   const r=simulate(sc), dv=r.dv, keys=Object.keys(r.killsPerEnc);

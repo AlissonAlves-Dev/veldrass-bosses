@@ -46,6 +46,8 @@ function buildChar(){
    ['Velocidade de ataque %','atkSpeed',0.5],['Defesa dos itens (sem pontos/pet)','itemsDef'],['Nível de Escudo','shield']
   ].forEach(rows);
   const sep=document.createElement('div'); sep.className='pet-sep'; sep.innerHTML='<span>Pet equipado (bônus do pet)</span>'; el.appendChild(sep);
+  selRow(el,'Raridade do pet','petRarity',Object.entries(PETS).map(([k,p])=>[k,p.nome]));
+  numRow(el,'Nível efetivo do pet (nível + 10 por estrela)','petLevel');
   [['Ataque do pet','petAtk'],['Defesa do pet','petDef'],['Chance de crítico do pet %','petCrit',0.1],['Dano crítico do pet %','petCritDmg',0.1],
    ['Velocidade de ataque do pet %','petSpeed',0.1],['Skill de ataque do pet (níveis)','petAtkSkill'],['Skill de defesa do pet (níveis)','petDefSkill']
   ].forEach(rows); stripe(el);
@@ -95,7 +97,7 @@ function buildHunt(){
   const f=document.createElement('div'); f.className='row'; f.style.gridTemplateColumns='1fr auto';
   f.innerHTML='<label>Contar fragmentos de fusão no ouro/h (loteria)</label>'; const c=document.createElement('input'); c.type='checkbox'; c.checked=S.fragments; c.style.width='auto'; c.onchange=()=>{S.fragments=c.checked;schedule()}; f.appendChild(c); el.appendChild(f);
   selRow(el,'Comida que você usa (caçada e boss)','huntFood',Object.entries(FOODS).map(([k,f])=>[k,f.name+' (cura '+f.heal+')']),()=>{ S.heal=FOODS[S.huntFood].heal; });
-  [['Estoque de comida','stock'],['Comidas/h que você gasta (calibra a estimativa; 0 = só o modelo)','obsFoods']].forEach(a=>numRow(el,a[0],a[1]));
+  [['Estoque de comida','stock'],['Comidas/h que você gasta (opcional: ajusta a estimativa; 0 = só o modelo)','obsFoods']].forEach(a=>numRow(el,a[0],a[1]));
   selRow(el,'Comida que você usava ao medir as comidas/h','obsFood',Object.entries(FOODS).map(([k,f])=>[k,f.name+' (cura '+f.heal+')']));
   const h=document.createElement('p'); h.className='hint'; h.textContent='Espera entre encontros = 30 s × (1 − eficiência), arredondada para cima. Caçada máxima: 8 h.'; el.appendChild(h); stripe(el);
 }
@@ -162,10 +164,13 @@ function render(){
   let overhead=0;
   if(S.observedKills>0){ const kpe=Object.values(rA.killsPerEnc).reduce((a,b)=>a+b,0); overhead=3600/(S.observedKills/kpe)-dvA.wait-rA.actSecPerEnc; }
   const A=metrics(S.A,overhead), B=metrics(S.B,overhead);
-  // Comida: dano recebido por hora ÷ cura da comida escolhida. Se o usuário informar quantas comidas gasta (campo opcional), o dano é calibrado pelo cenário ativo.
-  const M={A,B}, dmgRaw={A:huntDamageH(S.A,A),B:huntDamageH(S.B,B)}, heal=FOODS[S.huntFood].heal;
-  const calib=(S.obsFoods>0&&dmgRaw[act]>0)?S.obsFoods*FOODS[S.obsFood].heal/dmgRaw[act]:1;
-  const dmgH={A:dmgRaw.A*calib,B:dmgRaw.B*calib}, foodsOf=(sc,fk)=>dmgH[sc]/FOODS[fk].heal, foodA=foodsOf('A',S.huntFood), foodB=foodsOf('B',S.huntFood);
+  // Comida: golpes sorteados na simulação (defesa, passiva, marcas) e regra de comer do jogo; o pet gasta comida até morrer.
+  const M={A,B}, H=RULES.maxHuntHours;
+  const cfOf=(id,fk)=>{ const m=M[id], cf=countFoods(m.r,FOODS[fk].heal,m.dv.maxHp), pet=petFoodsOver(cf,m.encH*m.r.actsPerEnc,H);
+    return {player:cf.player*m.encH, deaths:cf.playerDeaths*m.encH, petOver:pet.foods, petLifeH:pet.lifeHours, petLifeFoods:cf.petLifeEats}; };
+  let kCal=1; if(S.obsFoods>0){ const c=cfOf(act,S.obsFood), base=c.player+c.petOver/H; if(base>0) kCal=S.obsFoods/base; }
+  const foodsOf=(id,fk)=>{ const c=cfOf(id,fk); return {player:c.player*kCal, pet:c.petOver*kCal, total8:(c.player*H+c.petOver)*kCal, deaths:c.deaths, petLifeH:c.petLifeH, petLifeFoods:c.petLifeFoods*kCal}; };
+  const fA=foodsOf('A',S.huntFood), fB=foodsOf('B',S.huntFood), petOn=S.petRarity!=='none'&&S.petLevel>0;
   const rows=[
    ['Ações por encontro',A.r.actsPerEnc,B.r.actsPerEnc,2,true],
    ['Ciclo por encontro (s)',A.cycle,B.cycle,1,true],
@@ -176,29 +181,36 @@ function render(){
    ['Ouro total/h',A.totalGoldH,B.totalGoldH,0,false],
    [`Horas esperadas por ${inm(S.target)}`,1/A.tgtH,1/B.tgtH,1,true],
    [`Chance de ≥1 ${inm(S.target)} em ${S.horizon} h`,(1-Math.exp(-A.tgtH*S.horizon))*100,(1-Math.exp(-B.tgtH*S.horizon))*100,0,false,'%'],
-   ['Dano recebido/h (estimativa)',dmgH.A,dmgH.B,0,true],
-   ['Comidas/h ('+FOODS[S.huntFood].name+')',foodA,foodB,1,true],
+   ['Comidas/h do jogador ('+FOODS[S.huntFood].name+')',fA.player,fB.player,1,true],
   ];
   let h='<table><tr><th></th><th>'+scLabel('A')+'</th><th>'+scLabel('B')+'</th><th>Δ inativo vs ativo</th></tr>';
   rows.forEach(r=>{ h+=`<tr><td>${r[0]}</td><td>${fmt(r[1],r[3])}${r[5]||''}</td><td>${fmt(r[2],r[3])}${r[5]||''}</td>${act==='A'?delta(r[1],r[2],r[4]):delta(r[2],r[1],r[4])}</tr>`; });
   h+='</table>';
   // offline
-  const off=(m,food)=>({xp:m.xpH*RULES.maxHuntHours,gold:m.totalGoldH*RULES.maxHuntHours,kills:m.killsH*RULES.maxHuntHours,food:food*RULES.maxHuntHours});
-  const oA=off(A,foodA), oB=off(B,foodB);
+  const off=m=>({xp:m.xpH*H,gold:m.totalGoldH*H,kills:m.killsH*H});
+  const oA=off(A), oB=off(B);
+  const hoursOf=f=>f.total8>0?Math.min(H,S.stock/f.total8*H):H;
   h+=`<h3>Caçada offline de 8 h (máximo do jogo)</h3><table><tr><th></th><th>A</th><th>B</th></tr>
    <tr><td>XP</td><td>${fmt(oA.xp)}</td><td>${fmt(oB.xp)}</td></tr>
    <tr><td>Ouro (solto + loot NPC)</td><td>${fmt(oA.gold)}</td><td>${fmt(oB.gold)}</td></tr>
    <tr><td>Abates</td><td>${fmt(oA.kills)}</td><td>${fmt(oB.kills)}</td></tr>
-   <tr><td>Horas de comida no estoque</td><td>${foodA>0?fmt(S.stock/foodA,1):'—'}</td><td>${foodB>0?fmt(S.stock/foodB,1):'—'}</td></tr></table>`;
+   <tr><td>Comidas do jogador (${FOODS[S.huntFood].name})</td><td>${fmt(Math.ceil(fA.player*H))}</td><td>${fmt(Math.ceil(fB.player*H))}</td></tr>
+   ${petOn?`<tr><td>Comidas do pet (até ele morrer)</td><td>${fmt(Math.ceil(fA.pet))}</td><td>${fmt(Math.ceil(fB.pet))}</td></tr>`:''}
+   <tr><td>Comidas necessárias (estoque: ${fmt(S.stock)})</td><td class="${fA.total8>S.stock?'neg':''}">${fmt(Math.ceil(fA.total8))}</td><td class="${fB.total8>S.stock?'neg':''}">${fmt(Math.ceil(fB.total8))}</td></tr>
+   <tr><td>Horas que o estoque dura (máx. ${H})</td><td>${fmt(hoursOf(fA),1)}</td><td>${fmt(hoursOf(fB),1)}</td></tr></table>`;
+  const warnF=(id,f)=>f.deaths>0?`<div class="warn">Cenário ${id}: com ${FOODS[S.huntFood].name} o personagem chegaria a 0 HP cerca de ${fmt(f.deaths,1)} vez(es) por hora. Escolha uma comida de cura maior.</div>`:'';
+  h+=warnF('A',fA)+warnF('B',fB);
+  if(petOn){ const petTxt=(id,f)=>isFinite(f.petLifeH)?`no cenário ${id} ele morre em ${f.petLifeH*60<1?'menos de 1 min':'~'+fmt(f.petLifeH*60)+' min'}, depois de ~${fmt(f.petLifeFoods,1)} comidas`:`no cenário ${id} ele aguenta toda a caçada`;
+    h+=`<p class="hint">Pet ${PETS[S.petRarity].nome} nível ${fmt(S.petLevel)} (vida ${fmt(A.r.petMaxHp)}, defesa ${fmt(S.petDef)}): ${petTxt('A',fA)}; ${petTxt('B',fB)}. Pet morto não volta na mesma caçada.</p>`; }
   h+='<h3>Comidas gastas em 8 h, por tipo de comida</h3><table><tr><th>Comida</th><th>Cura</th><th>A</th><th>B</th></tr>';
-  Object.entries(FOODS).forEach(([k,fd])=>{ const a=foodsOf('A',k)*RULES.maxHuntHours, b=foodsOf('B',k)*RULES.maxHuntHours;
-    h+=`<tr${k===S.huntFood?' class="sel"':''}><td>${fd.name}</td><td>${fd.heal}</td><td>${fmt(Math.ceil(a))}</td><td>${fmt(Math.ceil(b))}</td></tr>`; });
+  Object.entries(FOODS).forEach(([k,fd])=>{ const a=foodsOf('A',k).total8, c=foodsOf('B',k).total8;
+    h+=`<tr${k===S.huntFood?' class="sel"':''}><td>${fd.name}</td><td>${fd.heal}</td><td>${fmt(Math.ceil(a))}</td><td>${fmt(Math.ceil(c))}</td></tr>`; });
   h+='</table>';
   // defesa
   h+='<h3>Defesa efetiva vs. ataque dos monstros (com a marca de defesa de cada um)</h3><table><tr><th>Monstro</th><th>Ataque</th><th>A: def '+fmt(A.dv.effDef)+'</th><th>B: def '+fmt(B.dv.effDef)+'</th></tr>';
   const reg=(def,atk)=>{ if(def>=2*atk) return `<span class="good">0–1 por golpe</span>`; if(def<atk) return `<span class="warn">pesado (~${fmt(Math.ceil((atk-def*0.975)*CLS().taken))}/golpe)</span>`; const leak=Math.ceil(0.05*atk)*(2*atk-def)/atk; return `vazamento ~${fmt(Math.ceil(leak*CLS().taken))}/golpe`; };
   monsKeys().forEach(m=>{ const a=DATA.monsters[m].attack, ds=MARK.ds[S.A.marks[m].ds]; h+=`<tr><td>${nm(m)}</td><td>${a}</td><td>${reg(A.dv.effDefFor(ds),a)}</td><td>${reg(B.dv.effDefFor(ds),a)}</td></tr>`; });
-  h+='</table><p class="hint">Calibração: espera extra por ciclo (latência, preparo) = '+fmt(overhead,1)+' s, ajustada para o cenário ativo ('+act+') bater com os seus '+fmt(S.observedKills)+' abates/h. Comidas = dano recebido por hora ÷ cura da comida escolhida (um ataque por monstro vivo a cada ação sua, com defesa, passiva e "dano recebido" da classe). Com as comidas/h em 0, vale só a estimativa do modelo.</p>';
+  h+='</table><p class="hint">Calibração: espera extra por ciclo (latência, preparo) = '+fmt(overhead,1)+' s, ajustada para o cenário ativo ('+act+') bater com os seus '+fmt(S.observedKills)+' abates/h. Comidas: cada ataque de monstro é sorteado com a defesa efetiva, a passiva e o "dano recebido" da classe; o jogador come 1 comida por ação, só quando falta HP igual à cura. Não entram regeneração, veneno nem comida de outros tipos. Se você informar quantas comidas gasta por hora, a estimativa é ajustada por esse valor.</p>';
   document.querySelector('#results').innerHTML='<h2>Resultado</h2>'+h;
   // golpes para matar
   let g='<table><tr><th>Monstro</th><th>HP</th><th>Peso</th><th>A: golpes</th><th>A: falta p/ −1 golpe</th><th>B: golpes</th><th>B: falta p/ −1 golpe</th></tr>';
@@ -215,8 +227,8 @@ function render(){
   document.querySelector('#hits').innerHTML='<h2>Golpes para matar cada monstro</h2>'+g; renderBoss(); saveState();
 }
 const STORE='veldrass-calc-v1';
-const EDITABLE=['cls','level','weapon','petAtk','magic','magicBonus','dmgPct','critChance','critMult','atkSpeed','itemsDef','petDef','petCrit','petCritDmg','petSpeed','petAtkSkill','petDefSkill','shield','shieldBonus','defPct','hunt','huntEff','potionEff','amuletEff','observedKills','xpGlobal','lootRate','fragments','boostMon','boostXp','boostLoot','target','horizon','stock','obsFoods','bossN'];
-const BOSS_STR={bossKey:BOSSES,huntFood:FOODS,obsFood:FOODS,bossSc:{A:1,B:1},active:{A:1,B:1}};
+const EDITABLE=['cls','level','weapon','petAtk','magic','magicBonus','dmgPct','critChance','critMult','atkSpeed','itemsDef','petDef','petCrit','petCritDmg','petSpeed','petAtkSkill','petDefSkill','shield','shieldBonus','defPct','hunt','huntEff','potionEff','amuletEff','observedKills','xpGlobal','lootRate','fragments','boostMon','boostXp','boostLoot','target','horizon','stock','obsFoods','petLevel','bossN'];
+const BOSS_STR={bossKey:BOSSES,huntFood:FOODS,obsFood:FOODS,petRarity:PETS,bossSc:{A:1,B:1},active:{A:1,B:1}};
 function snapshot(){ const o={}; EDITABLE.forEach(k=>o[k]=S[k]); Object.keys(BOSS_STR).forEach(k=>o[k]=S[k]); o.marks=S.A.marks; o.parts=S.parts; o.partsOn=S.partsOn; ['A','B'].forEach(id=>{const s=S[id]; o[id]={atk:s.atk,def:s.def,hp:s.hp,pas:s.pas};}); return o; }
 function applyState(o){
   if(!o||typeof o!=='object') return;
