@@ -165,3 +165,29 @@ details summary { cursor: pointer; color: var(--gold-soft); font-weight: 700; }
 
 /* Percentuais das marcas no cabeçalho da coluna. */
 .mark .th-sub { display: block; margin-top: 2px; color: var(--muted); font-size: 0.68rem; font-weight: 600; }
+
+/* ---------- Celular ---------- */
+@media (max-width: 760px) {
+  /* Menos margem lateral nos cartões: mais largura para tabelas e campos. */
+  .calc-grid > section { padding: 16px 12px; }
+
+  /* Linhas com lista de seleção: o nome em cima e a lista embaixo, na largura toda. */
+  .calc-page .row:has(select) { grid-template-columns: minmax(0, 1fr) !important; padding: 6px 10px 8px; gap: 4px; }
+
+  /* Alvos de toque de 40 px e fonte de 16 px (abaixo disso o iPhone dá zoom ao tocar no campo). */
+  .calc-page .row input:not([type="checkbox"]),
+  .calc-page .row select,
+  .mark select { height: 40px; min-height: 40px; font-size: 16px; }
+  .calc-page input[type="checkbox"] { width: 22px; height: 22px; }
+  .sc-activate { min-height: 40px; }
+
+  /* Marcas do Bestiário: cada monstro vira um cartão, com o nome do campo ao lado da lista. */
+  .mark, .mark tbody, .mark tr, .mark td { display: block; width: 100%; }
+  .mark tr:first-child { display: none; }
+  .mark tr { margin: 0 0 12px; padding: 6px 10px 8px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.03); }
+  .mark td { padding: 0; }
+  .mark .mark-name { padding: 6px 0 8px; font-family: Georgia, "Times New Roman", serif; font-size: 1rem; font-weight: 700; color: var(--gold-soft); text-align: left; }
+  .mark td[data-label] { display: grid; grid-template-columns: minmax(0, 1fr) 120px; align-items: center; gap: 8px; padding: 3px 0; text-align: left; }
+  .mark td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 0.84rem; }
+  .mark td[data-label] select { width: 100%; }
+}

@@ -419,3 +419,29 @@ footer .footer-note { text-align: center; }
 footer .footer-row { justify-content: center; text-align: center; }
 footer .footer-contact { margin-left: 0; text-align: center; }
 footer .footer-note span { display: block; }
+
+/* ---------- Celular ---------- */
+@media (max-width: 560px) {
+  /* Marca e relógio na mesma linha; o menu fica logo abaixo. */
+  .topbar { gap: 10px 8px; }
+  .brand { gap: 9px; min-width: 0; flex: 1 1 0; }
+  .brand > span:last-child { min-width: 0; }
+  .brand strong, .brand small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .brand-mark { width: 38px; height: 38px; }
+  .brand strong { font-size: 0.95rem; letter-spacing: 0.01em; }
+  .clock { padding: 7px 10px; flex: 0 0 auto; }
+
+  /* Título do evento menor, para nomes longos de boss não ocuparem 4 linhas. */
+  h1 { font-size: clamp(1.6rem, 8vw, 2rem); }
+  .command-panel { padding: 22px 18px; }
+  .hero-countdown span { font-size: clamp(2rem, 11vw, 2.6rem); }
+
+  /* Textos pequenos um pouco maiores e links do rodapé mais fáceis de tocar. */
+  footer { font-size: 0.78rem; }
+  footer a { display: inline-block; padding: 6px 2px; }
+  .site-nav a { padding: 10px 14px; }
+}
+@media (max-width: 760px) {
+  /* Campos de formulário com 16 px evitam o zoom automático do iPhone. */
+  input, select, textarea { font-size: 16px; }
+}
