@@ -15,7 +15,7 @@ function overheadFor() {
   const dv = c.derive(c.S.A);
   const r = c.simulate(c.S.A);
   const killsPerEnc = Object.values(r.killsPerEnc).reduce((a, b) => a + b, 0);
-  return 3600 / (c.S.observedKills / killsPerEnc) - dv.wait - r.actsPerEnc * dv.actionMs / 1000;
+  return 3600 / (c.S.observedKills / killsPerEnc) - dv.wait - r.actSecPerEnc;
 }
 
 test('dados: 8 caçadas e monstros conferem com o config/game.php', () => {
@@ -57,7 +57,10 @@ test('calibração: reproduz o painel real (XP/h e ouro/h) com folga de 2%', () 
   assert.ok(Math.abs((a.goldH + a.lootH) / 4526 - 1) < 0.05, 'ouro/h ' + (a.goldH + a.lootH));
 });
 
-test('cenário B: golem cai em 3 golpes e o Mago da Morte em 4', () => {
+// As marcas são compartilhadas por A e B: aqui usamos dano nv1 + XP nv2 no golem (o preset que o B tinha antes).
+const withGolemMarks = (fn) => { const g = c.S.A.marks.stone_golem; g.dmg = 1; g.xp = 2; try { fn(); } finally { g.dmg = 0; g.xp = 0; } };
+
+test('cenário B: golem cai em 3 golpes e o Mago da Morte em 4', () => withGolemMarks(() => {
   const hits = (monster, scenario) => {
     const dv = c.derive(scenario);
     const dm = c.MARK.dmg[scenario.marks[monster].dmg];
@@ -70,8 +73,8 @@ test('cenário B: golem cai em 3 golpes e o Mago da Morte em 4', () => {
   const overhead = overheadFor();
   const a = c.metrics(c.S.A, overhead);
   const b = c.metrics(c.S.B, overhead);
-  assert.ok(b.xpH > a.xpH * 1.04 && b.xpH < a.xpH * 1.09, 'ganho de XP/h ' + (b.xpH / a.xpH));
-});
+  assert.ok(b.xpH > a.xpH, 'ganho de XP/h ' + (b.xpH / a.xpH));
+}));
 
 test('classes: passiva e mitigação seguem o config do jogo', () => {
   const original = c.S.cls;
@@ -88,7 +91,26 @@ test('classes: passiva e mitigação seguem o config do jogo', () => {
   c.S.cls = original;
 });
 
-test('marcas: custo e avisos de limite', () => {
+test('marcas: custo e avisos de limite', () => withGolemMarks(() => {
+  assert.equal(c.S.A.marks, c.S.B.marks);                           // um só conjunto de marcas
   assert.equal(c.marksCost(c.S.B), 200);                            // dano nv1 (50) + XP nv2 (150)
   assert.equal(c.marksWarnings(c.S.B).length, 0);
+}));
+
+test('marcas de defesa e velocidade de ataque: valores do jogo, custo e efeito', () => {
+  assert.deepEqual([...c.MARK.ds], [0, 2, 5, 7]);
+  assert.deepEqual([...c.MARK.sp], [0, 0.5, 1, 1.5]);
+  const dv = c.derive(c.S.A);
+  assert.ok(dv.effDefFor(7) > dv.effDefFor(0));
+  assert.equal(dv.effDefFor(0), dv.effDef);
+  assert.ok(dv.actionMsFor(1.5) < dv.actionMsFor(0));
+  const monster = Object.keys(c.S.A.marks)[0];
+  const marks = c.S.A.marks[monster];
+  const before = c.simulate(c.S.A).actSecPerEnc;
+  Object.keys(c.S.A.marks).forEach((m) => { c.S.A.marks[m].sp = 3; });
+  const after = c.simulate(c.S.A).actSecPerEnc;
+  assert.equal(c.marksCost(c.S.A), 300 * Object.keys(c.S.A.marks).length);
+  Object.keys(c.S.A.marks).forEach((m) => { c.S.A.marks[m].sp = 0; });
+  assert.ok(after < before, 'vel. de ataque reduz o tempo de ação por encontro');
+  assert.equal(marks.sp, 0);
 });

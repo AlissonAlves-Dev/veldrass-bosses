@@ -46,14 +46,23 @@
           <button id="btnShare" class="button button-primary" type="button">Copiar link com meus valores</button>
           <button id="btnReset" class="button button-muted" type="button">Restaurar padrões</button>
         </div>
+        <p class="hint calc-hero-note">
+        <strong>Copiar link com meus valores:</strong> gera um endereço desta calculadora com tudo o que você
+        preencheu (classe, caçada, pontos e marcas dos builds A e B) e copia para a área de transferência.
+        Quem abrir o link vê exatamente os mesmos números. Os valores ficam só no endereço (depois do #),
+        sem envio a servidor. <strong>Restaurar padrões</strong> apaga os valores salvos neste navegador e recarrega a página.
+        </p>
       </section>
 
       <div class="calc-grid">
-        <section id="char"><h2>Personagem</h2></section>
-        <section id="huntbox"><h2>Caçada e bônus</h2></section>
+        <section class="wide" id="char"><h2>Personagem</h2></section>
         <section id="scA"></section>
         <section id="scB"></section>
+        <section class="wide" id="ptsresult"></section>
+        <section class="wide" id="huntbox"><h2>Caçada e bônus</h2></section>
+        <section class="wide" id="marksbox"></section>
         <section class="wide" id="results"><h2>Resultado</h2></section>
+        <section class="wide" id="bossbox"></section>
         <section class="wide" id="hits"><h2>Golpes para matar cada monstro</h2></section>
         <section class="wide" id="rulesbox"></section>
       </div>
@@ -70,6 +79,7 @@
 
     <script src="/calculadora/data.js" defer></script>
     <script src="/calculadora/calc-core.js" defer></script>
+    <script src="/calculadora/boss.js" defer></script>
     <script src="/calculadora/calc.js" defer></script>
   </body>
 </html>

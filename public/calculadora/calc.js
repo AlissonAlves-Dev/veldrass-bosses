@@ -1,11 +1,34 @@
 // Interface da calculadora (depende de data.js e calc-core.js).
 // ---------- UI ----------
+// Alterna o fundo das linhas visíveis de um bloco (ignora as de detalhe fechadas).
+function stripe(sec){ if(!sec) return; let n=0; sec.querySelectorAll('.row').forEach(r=>{ const hidden=r.closest('[hidden]'); r.classList.toggle('alt',!hidden&&(n%2===1)); if(!hidden) n++; }); }
 function numRow(parent,label,key,step=1,min=0,suffix=''){
   const row=document.createElement('div'); row.className='row';
   row.innerHTML=`<label>${label}</label>`;
   const i=document.createElement('input'); i.type='number'; i.step=step; i.min=min; i.value=S[key];
   i.oninput=()=>{ S[key]=parseFloat(i.value)||0; schedule(); };
   row.appendChild(i); parent.appendChild(row);
+}
+// Campos que são a soma de vários equipamentos: clicar no nome abre um valor por equipamento e o total é somado.
+// Slots que carregam cada stat (config/game.php): defesa em elmo/armadura/calça/luvas/botas/escudo; bônus de skill de arma
+// em elmo/armadura/calça/luvas/botas; chance de crítico na arma e em uma armadura.
+const SLOTS_ARMOR=[['helmet','Elmo'],['armor','Armadura'],['legs','Calça'],['gloves','Luvas'],['boots','Botas']];
+const PARTS={itemsDef:[...SLOTS_ARMOR,['shield','Escudo']], magicBonus:SLOTS_ARMOR, critChance:[['weapon','Arma'],['armor','Armadura']]};
+const partsSum=key=>PARTS[key].reduce((a,[slot])=>a+(Number((S.parts[key]||{})[slot])||0),0);
+function numRowParts(parent,label,key,step=1,min=0){
+  const row=document.createElement('div'); row.className='row';
+  const lab=document.createElement('label'); lab.className='partlabel'; lab.title='Clique para digitar o valor de cada equipamento';
+  const i=document.createElement('input'); i.type='number'; i.step=step; i.min=min; i.value=S[key];
+  const box=document.createElement('div'); box.className='parts';
+  const paint=()=>{ const on=!!S.partsOn[key]; lab.textContent=(on?'▾ ':'▸ ')+label; box.hidden=!on; i.readOnly=on; i.title=on?'Soma dos equipamentos abaixo':''; };
+  i.oninput=()=>{ S[key]=parseFloat(i.value)||0; schedule(); };
+  lab.onclick=()=>{ S.partsOn[key]=!S.partsOn[key]; if(S.partsOn[key]){ S[key]=partsSum(key); i.value=S[key]; } paint(); stripe(parent); schedule(); };
+  PARTS[key].forEach(([slot,name])=>{
+    const r=document.createElement('div'); r.className='row'; r.innerHTML='<label>'+name+'</label>';
+    const p=document.createElement('input'); p.type='number'; p.step=step; p.min=min; p.value=(S.parts[key]||{})[slot]||0;
+    p.oninput=()=>{ (S.parts[key]=S.parts[key]||{})[slot]=parseFloat(p.value)||0; S[key]=partsSum(key); i.value=S[key]; schedule(); };
+    r.appendChild(p); box.appendChild(r); });
+  row.appendChild(lab); row.appendChild(i); parent.appendChild(row); parent.appendChild(box); paint();
 }
 function buildChar(){
   const el=document.getElementById('char'); el.innerHTML='<h2>Personagem</h2>';
@@ -15,19 +38,25 @@ function buildChar(){
   sel.onchange=()=>{ S.cls=sel.value; buildChar(); buildScenarios(); render(); };
   r.appendChild(sel); el.appendChild(r);
   const card=document.createElement('div'); card.id='classcard'; el.appendChild(card);
+  const h=document.createElement('p'); h.className='hint'; h.style.margin='12px 0 14px'; h.textContent='Campos abaixo do card são do seu personagem (editáveis). Os modificadores da classe, marcados com cadeado, são fixos do jogo. Ao trocar de classe, ajuste arma, skills e defesa. Nos campos com ▸, clique no nome para digitar o valor de cada equipamento; o total é somado sozinho.'; el.appendChild(h);
   const c=CLS();
-  [['Nível do personagem','level',1,1],['Ataque da arma (já com aprimoramento)','weapon'],['Ataque do pet','petAtk'],['Nível de '+c.skill,'magic'],['Bônus de skill de '+c.skill+' (itens)','magicBonus'],
+  const rows=a=>(PARTS[a[1]]?numRowParts:numRow)(el,a[0],a[1],a[2]||1,a[3]!==undefined?a[3]:0);
+  [['Nível do personagem','level',1,1],['Ataque da arma (já com aprimoramento)','weapon'],['Nível de '+c.skill,'magic'],['Bônus de skill de '+c.skill+' (itens)','magicBonus'],
    ['Dano % extra (encantos)','dmgPct'],['Chance de crítico %','critChance',0.1],['Dano crítico % (como no painel)','critMult'],
-   ['Velocidade de ataque %','atkSpeed',0.5],['Defesa dos itens (sem pontos/pet)','itemsDef'],['Defesa do pet','petDef'],['Nível de Escudo','shield']
-  ].forEach(a=>numRow(el,a[0],a[1],a[2]||1,a[3]!==undefined?a[3]:0));
-  const h=document.createElement('p'); h.className='hint'; h.textContent='Campos abaixo do card são do seu personagem (editáveis). Os modificadores da classe, marcados com cadeado, são fixos do jogo. Ao trocar de classe, ajuste arma, skills e defesa.'; el.appendChild(h);
+   ['Velocidade de ataque %','atkSpeed',0.5],['Defesa dos itens (sem pontos/pet)','itemsDef'],['Nível de Escudo','shield']
+  ].forEach(rows);
+  const sep=document.createElement('div'); sep.className='pet-sep'; sep.innerHTML='<span>Pet equipado (bônus do pet)</span>'; el.appendChild(sep);
+  [['Ataque do pet','petAtk'],['Defesa do pet','petDef'],['Chance de crítico do pet %','petCrit',0.1],['Dano crítico do pet %','petCritDmg',0.1],
+   ['Velocidade de ataque do pet %','petSpeed',0.1],['Skill de ataque do pet (níveis)','petAtkSkill'],['Skill de defesa do pet (níveis)','petDefSkill']
+  ].forEach(rows); stripe(el);
 }
+const SHOW_ELITE=false; // classe elite ainda não existe no jogo; mude para true quando for lançada
 function renderClassCard(a,b){
   const el=document.getElementById('classcard'); if(!el) return; const c=CLS();
   const pct=x=>fmt(x,1)+'%', L='<span class="lock" title="Valor fixo do jogo (não editável)">🔒</span>';
   const mit=x=>c.passiva.tipo==='splash'?'—':pct(x*100);
   const extra = c.passiva.tipo==='splash' ? 'splash em todos os alvos' : (c.passiva.tipo==='block'?'dano reduzido pela metade':'golpe evitado');
-  el.innerHTML='<div class="ccard"><div class="chead"><b>'+c.nome+'</b><span class="tag">'+L+'elite: '+c.elite+'</span><span class="tag">'+L+'arma: '+c.arma+'</span></div>'
+  el.innerHTML='<div class="ccard"><div class="chead"><b>'+c.nome+'</b>'+(SHOW_ELITE?'<span class="tag">'+L+'elite: '+c.elite+'</span>':'')+'<span class="tag">'+L+'arma: '+c.arma+'</span></div>'
    +'<table class="fixed"><tr><th>Modificador</th><th>Valor</th></tr>'
    +'<tr><td>'+L+'Eficiência de ataque</td><td>× '+fmt(c.eff,2)+'</td></tr>'
    +'<tr><td>'+L+'Dano recebido</td><td>× '+fmt(c.taken,2)+'</td></tr>'
@@ -35,13 +64,14 @@ function renderClassCard(a,b){
    +'<tr><td>'+L+'Skill de arma</td><td>'+c.skill+' (XP de skill × '+fmt(c.skillMod,2)+')</td></tr>'
    +'<tr><td>'+L+'Pontos de atributo</td><td>'+earned()+' ('+RULES.pointsPerStep+' a cada '+RULES.levelsPerStep+' níveis)</td></tr>'
    +'<tr><td>'+L+'Passiva: '+c.passiva.nome+' (base)</td><td>'+pct(c.passiva.chance)+'</td></tr>'
-   +'<tr><th colspan="2">Resultado com seus pontos (calculado)</th></tr>'
-   +'<tr><td>Passiva efetiva</td><td>A '+pct(a.passivePct)+' · B '+pct(b.passivePct)+'</td></tr>'
-   +'<tr><td>Mitigação de dano ('+extra+')</td><td>A '+mit(a.mitig)+' · B '+mit(b.mitig)+'</td></tr>'
-   +'<tr><td>Dano por golpe</td><td>A '+fmt(a.D)+' · B '+fmt(b.D)+'</td></tr>'
-   +'<tr><td>HP máximo</td><td>A '+fmt(a.maxHp)+' · B '+fmt(b.maxHp)+'</td></tr>'
-   +'<tr><td>Defesa efetiva</td><td>A '+fmt(a.effDef)+' · B '+fmt(b.effDef)+'</td></tr></table>'
-   +'<div class="sub">'+c.passiva.desc+'</div></div>';
+   +'</table><div class="sub">'+c.passiva.desc+'</div></div>';
+  const pr=document.getElementById('ptsresult');
+  if(pr) pr.innerHTML='<h2>Resultado com seus pontos (calculado)</h2><table class="fixed"><tr><th></th><th>'+scLabel('A')+'</th><th>'+scLabel('B')+'</th></tr>'
+   +'<tr><td>Passiva efetiva</td><td>'+pct(a.passivePct)+'</td><td>'+pct(b.passivePct)+'</td></tr>'
+   +'<tr><td>Mitigação de dano ('+extra+')</td><td>'+mit(a.mitig)+'</td><td>'+mit(b.mitig)+'</td></tr>'
+   +'<tr><td>Dano por golpe</td><td>'+fmt(a.D)+'</td><td>'+fmt(b.D)+'</td></tr>'
+   +'<tr><td>HP máximo</td><td>'+fmt(a.maxHp)+'</td><td>'+fmt(b.maxHp)+'</td></tr>'
+   +'<tr><td>Defesa efetiva</td><td>'+fmt(a.effDef)+'</td><td>'+fmt(b.effDef)+'</td></tr></table>';
 }
 function buildHunt(){
   const el=document.getElementById('huntbox'); el.innerHTML='<h2>Caçada e bônus</h2>';
@@ -64,12 +94,15 @@ function buildHunt(){
   numRow(el,'Horizonte do item alvo (h)','horizon');
   const f=document.createElement('div'); f.className='row'; f.style.gridTemplateColumns='1fr auto';
   f.innerHTML='<label>Contar fragmentos de fusão no ouro/h (loteria)</label>'; const c=document.createElement('input'); c.type='checkbox'; c.checked=S.fragments; c.style.width='auto'; c.onchange=()=>{S.fragments=c.checked;schedule()}; f.appendChild(c); el.appendChild(f);
-  [['Cura da comida (perca = 70)','heal'],['Estoque de comida','stock'],['Comidas/h observadas hoje (cenário A)','obsFoods']].forEach(a=>numRow(el,a[0],a[1]));
-  const h=document.createElement('p'); h.className='hint'; h.textContent='Espera entre encontros = 30 s × (1 − eficiência), arredondada para cima. Caçada máxima: 8 h.'; el.appendChild(h);
+  [['Cura da comida (perca = 70)','heal'],['Estoque de comida','stock'],['Comidas/h observadas hoje (cenário ativo)','obsFoods']].forEach(a=>numRow(el,a[0],a[1]));
+  const h=document.createElement('p'); h.className='hint'; h.textContent='Espera entre encontros = 30 s × (1 − eficiência), arredondada para cima. Caçada máxima: 8 h.'; el.appendChild(h); stripe(el);
 }
 function fixTarget(){ const drops=new Set(); monsKeys().forEach(m=>DATA.monsters[m].drops.forEach(d=>drops.add(d.key))); if(!drops.has(S.target)) S.target=[...drops].find(k=>/key/.test(k))||[...drops][0]; }
-function buildScenario(id,title){
-  const sc=S[id], el=document.getElementById('sc'+id); el.innerHTML=`<h2>Cenário ${id} — ${title}</h2>`;
+function scLabel(id){ return id+' ('+(S.active===id?'ativo':'inativo')+')'; }
+function buildScenario(id){
+  const sc=S[id], el=document.getElementById('sc'+id); el.innerHTML=`<div class="sc-head"><h2>Atributos — Cenário ${scLabel(id)}</h2></div>`;
+  if(S.active!==id){ const b=document.createElement('button'); b.type='button'; b.className='button button-muted sc-activate'; b.textContent='Tornar ativo';
+    b.onclick=()=>{ S.active=id; buildScenarios(); render(); }; el.querySelector('.sc-head').appendChild(b); }
   const grid=document.createElement('div'); grid.id='pts'+id;
   [['Ataque','atk'],['Defesa','def'],['Vida','hp'],['Passiva ('+CLS().passiva.nome+')','pas']].forEach(([l,k])=>{
     const r=document.createElement('div'); r.className='row'; r.innerHTML=`<label>${l}</label>`;
@@ -77,44 +110,56 @@ function buildScenario(id,title){
   });
   el.appendChild(grid);
   const pts=document.createElement('div'); pts.className='pts'; pts.id='ptsinfo'+id; el.appendChild(pts);
-  const mh=document.createElement('h3'); mh.textContent='Marcas do Bestiário (nível 0–3) e etapa'; el.appendChild(mh);
+  const w=document.createElement('div'); w.id='warn'+id; el.appendChild(w);
+
+  updatePts(id); stripe(el);
+}
+function buildMarks(){
+  const el=document.getElementById('marksbox'); if(!el) return; el.innerHTML='<h2>Marcas do Bestiário (nível 0–3) e etapa</h2>';
+  const sc=S.A; // as marcas são as mesmas nos cenários A e B (S.A.marks === S.B.marks)
+  const pts=document.createElement('div'); pts.className='pts'; pts.id='marksinfo'; el.appendChild(pts);
   const t=document.createElement('table'); t.className='mark';
-  t.innerHTML='<tr><th>Monstro</th><th>Dano</th><th>XP</th><th>Crít.</th><th>D.crít.</th><th>Etapa</th></tr>';
+  t.innerHTML='<tr><th>Monstro</th><th>Dano</th><th>XP</th><th>Crít.</th><th>D.crít.</th><th>Defesa</th><th>Vel. atq.</th><th>Etapa</th></tr>';
   monsKeys().forEach(m=>{
     const tr=document.createElement('tr'); tr.innerHTML=`<td>${nm(m)}</td>`;
-    ['dmg','xp','cc','cd'].forEach(ty=>{
+    MARK_TYPES.forEach(ty=>{
       const td=document.createElement('td'); const s=document.createElement('select');
       s.innerHTML=MARK[ty].map((v,i)=>`<option value="${i}">${i===0?'—':'nv'+i+' (+'+v+'%)'}</option>`).join(''); s.value=sc.marks[m][ty];
-      s.onchange=()=>{sc.marks[m][ty]=+s.value; updatePts(id); schedule()}; td.appendChild(s); tr.appendChild(td);
+      s.onchange=()=>{sc.marks[m][ty]=+s.value; updateMarks(); schedule()}; td.appendChild(s); tr.appendChild(td);
     });
     const td=document.createElement('td'); const s=document.createElement('select');
     s.innerHTML=STAGEXP.map((v,i)=>`<option value="${i}">${i}${v?` (+${v}% XP)`:''}</option>`).join(''); s.value=sc.marks[m].stage; s.onchange=()=>{sc.marks[m].stage=+s.value;schedule()}; td.appendChild(s); tr.appendChild(td);
     t.appendChild(tr);
   });
   el.appendChild(t);
-  const w=document.createElement('div'); w.id='warn'+id; el.appendChild(w);
-  const hh=document.createElement('p'); hh.className='hint'; hh.textContent='Etapa do Bestiário: bônus de XP por espécie (2/3/4/5%) conforme os abates. Máx. 2 marcas por monstro; cada marca (tipo+nível) fica em um monstro só; tirar marca de Elite custa 30 mil de ouro.'; el.appendChild(hh);
-  updatePts(id);
+  const w=document.createElement('div'); w.id='markswarn'; el.appendChild(w);
+  const hh=document.createElement('p'); hh.className='hint'; hh.textContent='Etapa do Bestiário: bônus de XP por espécie (2/3/4/5%) conforme os abates. Máx. 2 marcas por monstro; cada marca (tipo+nível) fica em um monstro só; tirar marca de Elite custa 30 mil de ouro. As marcas valem para os cenários A e B.'; el.appendChild(hh);
+  updateMarks();
+}
+function updateMarks(){
+  document.getElementById('marksinfo').innerHTML='<span>Marcas: <b>'+marksCost(S.A)+'</b> pts</span>';
+  document.getElementById('markswarn').innerHTML=marksWarnings(S.A).map(x=>`<div class="warn">${x}</div>`).join('');
 }
 function updatePts(id){
-  const sc=S[id], used=sc.atk+sc.def+sc.hp+sc.pas, left=earned()-used, cost=marksCost(sc);
-  document.getElementById('ptsinfo'+id).innerHTML=`<span>Pontos de atributo: <b class="${left<0?'warn':''}">${used}/${earned()}</b> (${left>=0?left+' livres':'excede '+(-left)})</span><span>Marcas: <b>${cost}</b> pts</span>`;
-  const w=marksWarnings(sc); if(left<0) w.unshift('Você distribuiu mais pontos de atributo do que tem.');
+  const sc=S[id], used=sc.atk+sc.def+sc.hp+sc.pas, left=earned()-used;
+  document.getElementById('ptsinfo'+id).innerHTML=`<span>Pontos de atributo: <b class="${left<0?'warn':''}">${used}/${earned()}</b> (${left>=0?left+' livres':'excede '+(-left)})</span>`;
+  const w=[]; if(left<0) w.push('Você distribuiu mais pontos de atributo do que tem.');
   document.getElementById('warn'+id).innerHTML=w.map(x=>`<div class="warn">${x}</div>`).join('');
 }
-function buildScenarios(){ buildScenario('A','hoje'); buildScenario('B','proposto'); }
+function buildScenarios(){ buildScenario('A'); buildScenario('B'); buildMarks(); }
 
 // ---------- resultado ----------
 let timer=null; function schedule(){ clearTimeout(timer); timer=setTimeout(render,60); }
 function delta(a,b,inv=false){ if(!isFinite(a)||a===0) return '<td class="d">—</td>'; const d=(b-a)/a*100; const good=inv?d<0:d>0; const cls=Math.abs(d)<0.05?'':(good?'pos':'neg'); return `<td class="d ${cls}">${d>0?'+':''}${fmt(d,1)}%</td>`; }
 function render(){
-  // calibração: overhead pelo cenário A
+  // calibração: overhead pelo cenário ativo
   updatePts('A'); updatePts('B');
-  const dvA=derive(S.A), rA=simulate(S.A); renderClassCard(dvA, derive(S.B));
+  const act=S.active, oth=act==='A'?'B':'A';
+  const dvA=derive(S[act]), rA=simulate(S[act]); renderClassCard(derive(S.A), derive(S.B));
   let overhead=0;
-  if(S.observedKills>0){ const kpe=Object.values(rA.killsPerEnc).reduce((a,b)=>a+b,0); overhead=3600/(S.observedKills/kpe)-dvA.wait-rA.actsPerEnc*dvA.actionMs/1000; }
+  if(S.observedKills>0){ const kpe=Object.values(rA.killsPerEnc).reduce((a,b)=>a+b,0); overhead=3600/(S.observedKills/kpe)-dvA.wait-rA.actSecPerEnc; }
   const A=metrics(S.A,overhead), B=metrics(S.B,overhead);
-  const foodA=S.obsFoods, foodB=S.obsFoods*(B.attacksH/A.attacksH);
+  const M={A,B}, food={[act]:S.obsFoods,[oth]:S.obsFoods*(M[oth].attacksH/M[act].attacksH)}, foodA=food.A, foodB=food.B;
   const rows=[
    ['Dano por golpe (sem crítico)',A.dv.D,B.dv.D,0,false],
    ['Chance de splash % (só Mago)',A.dv.p*100,B.dv.p*100,1,false],
@@ -131,8 +176,8 @@ function render(){
    ['HP máximo',A.dv.maxHp,B.dv.maxHp,0,false],
    ['Comidas/h (estimativa)',foodA,foodB,1,true],
   ];
-  let h='<table><tr><th></th><th>A (hoje)</th><th>B (proposto)</th><th>Δ</th></tr>';
-  rows.forEach(r=>{ h+=`<tr><td>${r[0]}</td><td>${fmt(r[1],r[3])}${r[5]||''}</td><td>${fmt(r[2],r[3])}${r[5]||''}</td>${delta(r[1],r[2],r[4])}</tr>`; });
+  let h='<table><tr><th></th><th>'+scLabel('A')+'</th><th>'+scLabel('B')+'</th><th>Δ inativo vs ativo</th></tr>';
+  rows.forEach(r=>{ h+=`<tr><td>${r[0]}</td><td>${fmt(r[1],r[3])}${r[5]||''}</td><td>${fmt(r[2],r[3])}${r[5]||''}</td>${act==='A'?delta(r[1],r[2],r[4]):delta(r[2],r[1],r[4])}</tr>`; });
   h+='</table>';
   // offline
   const off=(m,food)=>({xp:m.xpH*RULES.maxHuntHours,gold:m.totalGoldH*RULES.maxHuntHours,kills:m.killsH*RULES.maxHuntHours,food:food*RULES.maxHuntHours});
@@ -144,10 +189,10 @@ function render(){
    <tr><td>Comidas necessárias (estoque: ${fmt(S.stock)})</td><td class="${oA.food>S.stock?'neg':''}">${fmt(oA.food)}</td><td class="${oB.food>S.stock?'neg':''}">${fmt(oB.food)}</td></tr>
    <tr><td>Horas de comida no estoque</td><td>${fmt(S.stock/foodA,1)}</td><td>${fmt(S.stock/foodB,1)}</td></tr></table>`;
   // defesa
-  h+='<h3>Defesa efetiva vs. ataque dos monstros</h3><table><tr><th>Monstro</th><th>Ataque</th><th>A: def '+fmt(A.dv.effDef)+'</th><th>B: def '+fmt(B.dv.effDef)+'</th></tr>';
+  h+='<h3>Defesa efetiva vs. ataque dos monstros (com a marca de defesa de cada um)</h3><table><tr><th>Monstro</th><th>Ataque</th><th>A: def '+fmt(A.dv.effDef)+'</th><th>B: def '+fmt(B.dv.effDef)+'</th></tr>';
   const reg=(def,atk)=>{ if(def>=2*atk) return `<span class="good">0–1 por golpe</span>`; if(def<atk) return `<span class="warn">pesado (~${fmt(Math.ceil((atk-def*0.975)*CLS().taken))}/golpe)</span>`; const leak=Math.ceil(0.05*atk)*(2*atk-def)/atk; return `vazamento ~${fmt(Math.ceil(leak*CLS().taken))}/golpe`; };
-  monsKeys().forEach(m=>{ const a=DATA.monsters[m].attack; h+=`<tr><td>${nm(m)}</td><td>${a}</td><td>${reg(A.dv.effDef,a)}</td><td>${reg(B.dv.effDef,a)}</td></tr>`; });
-  h+='</table><p class="hint">Calibração: espera extra por ciclo (latência, preparo) = '+fmt(overhead,1)+' s, ajustada para o cenário A bater com os seus '+fmt(S.observedKills)+' abates/h. Comidas/h do cenário B = comidas/h de A × (ataques sofridos B ÷ A).</p>';
+  monsKeys().forEach(m=>{ const a=DATA.monsters[m].attack, ds=MARK.ds[S.A.marks[m].ds]; h+=`<tr><td>${nm(m)}</td><td>${a}</td><td>${reg(A.dv.effDefFor(ds),a)}</td><td>${reg(B.dv.effDefFor(ds),a)}</td></tr>`; });
+  h+='</table><p class="hint">Calibração: espera extra por ciclo (latência, preparo) = '+fmt(overhead,1)+' s, ajustada para o cenário ativo ('+act+') bater com os seus '+fmt(S.observedKills)+' abates/h. Comidas/h do cenário inativo = comidas/h do ativo × (ataques sofridos inativo ÷ ativo).</p>';
   document.querySelector('#results').innerHTML='<h2>Resultado</h2>'+h;
   // golpes para matar
   let g='<table><tr><th>Monstro</th><th>HP</th><th>Peso</th><th>A: golpes</th><th>A: falta p/ −1 golpe</th><th>B: golpes</th><th>B: falta p/ −1 golpe</th></tr>';
@@ -161,11 +206,12 @@ function render(){
     g+=`<tr><td>${nm(m)}</td><td>${fmt(hp)}</td><td>${fmt(w,0)}%</td>${a[0]}${a[1]}${b[0]}${b[1]}</tr>`;
   });
   g+='</table><p class="hint">Golpes sem crítico. "Falta" = pontos de ataque a mais (com a marca de dano atual) para o monstro cair em um golpe a menos; as marcas de dano contam por espécie.</p>';
-  document.querySelector('#hits').innerHTML='<h2>Golpes para matar cada monstro</h2>'+g; saveState();
+  document.querySelector('#hits').innerHTML='<h2>Golpes para matar cada monstro</h2>'+g; renderBoss(); saveState();
 }
 const STORE='veldrass-calc-v1';
-const EDITABLE=['cls','level','weapon','petAtk','magic','magicBonus','dmgPct','critChance','critMult','atkSpeed','itemsDef','petDef','shield','shieldBonus','defPct','hunt','huntEff','potionEff','amuletEff','observedKills','xpGlobal','lootRate','fragments','boostMon','boostXp','boostLoot','target','horizon','heal','stock','obsFoods'];
-function snapshot(){ const o={}; EDITABLE.forEach(k=>o[k]=S[k]); ['A','B'].forEach(id=>{const s=S[id]; o[id]={atk:s.atk,def:s.def,hp:s.hp,pas:s.pas,marks:s.marks};}); return o; }
+const EDITABLE=['cls','level','weapon','petAtk','magic','magicBonus','dmgPct','critChance','critMult','atkSpeed','itemsDef','petDef','petCrit','petCritDmg','petSpeed','petAtkSkill','petDefSkill','shield','shieldBonus','defPct','hunt','huntEff','potionEff','amuletEff','observedKills','xpGlobal','lootRate','fragments','boostMon','boostXp','boostLoot','target','horizon','heal','stock','obsFoods','bossN'];
+const BOSS_STR={bossKey:BOSSES,bossFood:FOODS,bossSc:{A:1,B:1},active:{A:1,B:1}};
+function snapshot(){ const o={}; EDITABLE.forEach(k=>o[k]=S[k]); Object.keys(BOSS_STR).forEach(k=>o[k]=S[k]); o.marks=S.A.marks; o.parts=S.parts; o.partsOn=S.partsOn; ['A','B'].forEach(id=>{const s=S[id]; o[id]={atk:s.atk,def:s.def,hp:s.hp,pas:s.pas};}); return o; }
 function applyState(o){
   if(!o||typeof o!=='object') return;
   if(typeof o.cls==='string'&&CLASSES[o.cls]) S.cls=o.cls;
@@ -175,12 +221,18 @@ function applyState(o){
     else if(k==='target'){ S[k]=String(o[k]); }
     else if(k==='fragments'){ S[k]=!!o[k]; }
     else { const n=Number(o[k]); if(isFinite(n)&&n>=0&&n<=10000000) S[k]=n; } });
-  S.A.marks=emptyMarks(); S.B.marks=emptyMarks();
+  Object.keys(PARTS).forEach(k=>{ const src=o.parts&&o.parts[k]; S.parts[k]={};
+    PARTS[k].forEach(([slot])=>{ const n=Number(src&&src[slot]); if(isFinite(n)&&n>=0&&n<=100000) S.parts[k][slot]=n; });
+    S.partsOn[k]=!!(o.partsOn&&o.partsOn[k]); if(S.partsOn[k]) S[k]=partsSum(k); });
+  const shared=emptyMarks(); S.A.marks=shared; S.B.marks=shared;
+  // links antigos guardavam marcas por cenário: usa as do cenário A.
+  const ms=(o.marks&&typeof o.marks==='object')?o.marks:(o.A&&o.A.marks);
+  if(ms&&typeof ms==='object') monsKeys().forEach(m=>{ const mk=ms[m]; if(!mk||typeof mk!=='object') return;
+    MARK_TYPES.forEach(t=>{ const n=parseInt(mk[t]); if(n>=0&&n<=3) shared[m][t]=n; });
+    const st=parseInt(mk.stage); if(st>=0&&st<=5) shared[m].stage=st; });
   ['A','B'].forEach(id=>{ const s=o[id]; if(!s||typeof s!=='object') return;
-    ['atk','def','hp','pas'].forEach(k=>{ const n=parseInt(s[k]); if(isFinite(n)&&n>=0&&n<=10000) S[id][k]=n; });
-    if(s.marks&&typeof s.marks==='object') monsKeys().forEach(m=>{ const mk=s.marks[m]; if(!mk||typeof mk!=='object') return;
-      ['dmg','xp','cc','cd'].forEach(t=>{ const n=parseInt(mk[t]); if(n>=0&&n<=3) S[id].marks[m][t]=n; });
-      const st=parseInt(mk.stage); if(st>=0&&st<=5) S[id].marks[m].stage=st; }); });
+    ['atk','def','hp','pas'].forEach(k=>{ const n=parseInt(s[k]); if(isFinite(n)&&n>=0&&n<=10000) S[id][k]=n; }); });
+  Object.keys(BOSS_STR).forEach(k=>{ if(typeof o[k]==='string'&&Object.prototype.hasOwnProperty.call(BOSS_STR[k],o[k])) S[k]=o[k]; });
   fixTarget();
 }
 const encodeState=()=>btoa(unescape(encodeURIComponent(JSON.stringify(snapshot()))));
@@ -214,7 +266,37 @@ function renderRules(){
    +mk('Bônus de XP por etapa do Bestiário (1 a 5)',STAGEXP.slice(1).join('% / ')+'%')+cls
    +'</table><p class="hint">Monstros e caçadas: lidos do config/game.php do repositório (valores de 2026-11-20). Se o jogo for rebalanceado, estes dados ficam desatualizados.</p></details>';
 }
-initState(); buildChar(); buildHunt(); buildScenarios(); renderRules(); wireButtons(); render();
+
+// ---------- comida para world boss ----------
+function selRow(parent,label,key,opts){
+  const r=document.createElement('div'); r.className='row'; r.style.gridTemplateColumns='1fr 1fr'; r.innerHTML=`<label>${label}</label>`;
+  const sel=document.createElement('select'); sel.innerHTML=opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join(''); sel.value=S[key];
+  sel.onchange=()=>{ S[key]=sel.value; schedule(); }; r.appendChild(sel); parent.appendChild(r);
+}
+function buildBoss(){
+  const el=document.getElementById('bossbox'); if(!el) return; el.innerHTML='<h2>Comida para World Boss</h2>';
+  selRow(el,'Boss','bossKey',Object.entries(BOSSES).map(([k,b])=>[k,b.name+' (nível '+b.level+')']));
+  selRow(el,'Tipo de comida que você tem','bossFood',Object.entries(FOODS).map(([k,f])=>[k,f.name+' (cura '+f.heal+')']));
+  selRow(el,'Cenário de defesa','bossSc',[['A','Cenário A'],['B','Cenário B']]);
+  numRow(el,'Participantes no evento','bossN',1,1);
+  const out=document.createElement('div'); out.id='bossout'; el.appendChild(out); stripe(el);
+}
+function renderBoss(){
+  const out=document.getElementById('bossout'); if(!out) return;
+  const b=BOSSES[S.bossKey], f=FOODS[S.bossFood], r=bossFoodNeeded(S.bossKey,S.bossSc,S.bossN,S.bossFood);
+  let h=`<p class="big">${fmt(r.qty)} × ${f.name}</p><p class="hint">para aguentar os ${BOSS_BATTLE_SEC/60} min de luta contra ${b.name}, com a defesa do cenário ${S.bossSc} (${fmt(r.dv.effDef)}) e HP máximo ${fmt(r.maxHp)}.</p>`;
+  h+=`<table><tr><th>Dano esperado em ${BOSS_BATTLE_SEC/60} min</th><th>Valor</th></tr>
+   <tr><td>Golpes que acertam você (~)</td><td>${fmt(r.hitsOnMe,1)}</td></tr>
+   <tr><td>Dano dos golpes</td><td>${fmt(r.hitDmg)}</td></tr>`
+   +(b.effect?`<tr><td>Dano de ${b.effect.tipo.toLowerCase()} (${fmt(b.effect.chance*100)}% por golpe, ${b.effect.dmg} a cada ${b.effect.ms/1000} s)</td><td>${fmt(r.effDmg)}</td></tr>`:'')
+   +`<tr><td>Dano total</td><td>${fmt(r.total)}</td></tr></table>`;
+  if(r.maxHit>=r.maxHp) h+='<div class="warn">Um único golpe pode tirar todo o seu HP: comida não adianta, aumente defesa ou vida.</div>';
+  h+='<h3>Mesma luta com cada comida</h3><table><tr><th>Comida</th><th>Cura</th><th>Quantidade</th></tr>';
+  Object.entries(FOODS).forEach(([k,fd])=>{ h+=`<tr${k===S.bossFood?' class="sel"':''}><td>${fd.name}</td><td>${fd.heal}</td><td>${fmt(Math.ceil(r.total/fd.heal))}</td></tr>`; });
+  h+=`</table><p class="hint">Estimativa. Golpes de alvo único acertam você em 1 de ${fmt(Math.max(1,Math.floor(S.bossN)||1))} (participantes); golpes em área acertam todos. Usa a defesa efetiva, a passiva e o "dano recebido" da classe. Não inclui comida do pet, resistência a veneno/fogo nem regeneração.</p>`;
+  out.innerHTML=h;
+}
+initState(); buildChar(); buildBoss(); buildHunt(); buildScenarios(); renderRules(); wireButtons(); render();
 
 // Cache offline compartilhado com o Boss Watch.
 if ('serviceWorker' in navigator) {
