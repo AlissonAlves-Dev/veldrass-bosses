@@ -1,10 +1,12 @@
 // Cache offline não mantém o app executando nem agenda notificações push.
 const PREFIX = "boss-watch-local-";
-const CACHE_NAME = PREFIX + "2026-v3";
+const CACHE_NAME = PREFIX + "2026-v5";
 const APP_SHELL = [
-  "./", "./index.html", "./styles.css", "./bosses.js", "./app.js", "./manifest.webmanifest",
-  "./icons/portal.svg", "./icons/portal-192.png", "./icons/portal-512.png"
-  // Calculadora de farm: desativada por enquanto (ao reativar, volte a listar ./calculadora/* e suba a versão do cache).
+  "./", "./index.html", "./home.css", "./watch/", "./watch/index.html", "./styles.css", "./bosses.js", "./app.js", "./manifest.webmanifest",
+  "./icons/portal.svg", "./icons/portal-192.png", "./icons/portal-512.png",
+  // Calculadora de farm
+  "./calculadora/", "./calculadora/index.html", "./calculadora/calc.css",
+  "./calculadora/data.js", "./calculadora/calc-core.js", "./calculadora/calc.js"
 ];
 const allowed = new Set(APP_SHELL.map(path => new URL(path, self.registration.scope).href));
 

@@ -68,7 +68,7 @@ function simulate(sc, N=30000){
   const rnd=mulberry32(20261120);
   const pick=()=>{let r=rnd()*tw;for(const k of keys){r-=H.weights[k];if(r<0)return k}return keys[keys.length-1]};
   const mk=m=>sc.marks[m]||{dmg:0,xp:0,cc:0,cd:0,ds:0,sp:0,stage:0};
-  let acts=0, actSec=0, attacks=0; const kills=Object.fromEntries(keys.map(k=>[k,0]));
+  let acts=0, actSec=0, attacks=0; const atkBy=Object.fromEntries(keys.map(k=>[k,0])); const kills=Object.fromEntries(keys.map(k=>[k,0]));
   for(let t=0;t<N;t++){
     const n=RULES.encounterMin+Math.floor(rnd()*(RULES.encounterMax-RULES.encounterMin+1)); const ms=Array.from({length:n},pick); const hp=ms.map(m=>DATA.monsters[m].hp);
     // A duração da ação é fixada pela espécie do primeiro monstro do encontro (BattleQueueService).
@@ -82,12 +82,12 @@ function simulate(sc, N=30000){
       const dmg=isc?Math.round(dv.D*((S.critMult+S.petCritDmg)/100+MARK.cd[pm.cd]/100)):dv.D;
       if(hit) hp[i]=Math.max(0,hp[i]-Math.round(dmg*(1+MARK.dmg[pm.dmg]/100)));
       if(rnd()<dv.p){ for(let k=0;k<hp.length;k++) if(k!==i&&hp[k]>0) hp[k]=Math.max(0,hp[k]-Math.round(dmg*(1+MARK.dmg[mk(ms[k]).dmg]/100))); }
-      attacks+=hp.filter(h=>h>0).length;
+      for(let k=0;k<hp.length;k++) if(hp[k]>0){ attacks++; atkBy[ms[k]]++; }
     }
     ms.forEach(m=>kills[m]++);
   }
   const A=acts/N, killsPerEnc=Object.fromEntries(keys.map(k=>[k,kills[k]/N]));
-  return {dv, actsPerEnc:A, actSecPerEnc:actSec/N, attacksPerEnc:attacks/N, killsPerEnc};
+  return {dv, actsPerEnc:A, actSecPerEnc:actSec/N, attacksPerEnc:attacks/N, attacksBy:Object.fromEntries(keys.map(k=>[k,atkBy[k]/N])), killsPerEnc};
 }
 function metrics(sc, overhead){
   const r=simulate(sc), dv=r.dv, keys=Object.keys(r.killsPerEnc);

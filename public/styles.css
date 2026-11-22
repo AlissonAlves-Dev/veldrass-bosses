@@ -389,3 +389,33 @@ footer a:hover {
   .topbar { flex-wrap: wrap; row-gap: 12px; }
   .site-nav { order: 3; width: 100%; margin: 0; }
 }
+
+/* Rodapé no fim da página; se o conteúdo for curto, ele encosta no fundo da janela. */
+body { min-height: 100vh; min-height: 100dvh; }
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+footer { margin-top: auto; }
+
+/* Rodapé da calculadora: nota do modelo em cima; embaixo, "ferramenta de fã" à esquerda e contato à direita. */
+footer .footer-note { flex: 1 1 100%; }
+footer .footer-row {
+  display: flex;
+  flex: 1 1 100%;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+footer .footer-contact { margin-left: auto; text-align: right; }
+
+footer .footer-note { text-align: justify; font-size: 0.72rem; line-height: 1.5; }
+
+/* Teste: rodapé centralizado horizontalmente. Para voltar, apague este bloco. */
+footer { justify-content: center; text-align: center; }
+footer .footer-note { text-align: center; }
+footer .footer-row { justify-content: center; text-align: center; }
+footer .footer-contact { margin-left: 0; text-align: center; }
+footer .footer-note span { display: block; }

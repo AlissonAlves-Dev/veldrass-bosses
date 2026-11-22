@@ -2,7 +2,7 @@
   "name": "Boss Watch · Veldrass",
   "short_name": "Boss Watch",
   "description": "Horários e contagem regressiva dos bosses de Veldrass.",
-  "start_url": "./",
+  "start_url": "./watch/",
   "scope": "./",
   "display": "standalone",
   "background_color": "#090d13",
