@@ -30,6 +30,7 @@
 }
 
 .tool-card .button {
+  flex: 0 0 auto; /* o .button do styles.css usa flex-basis 180px no mobile, que viraria altura aqui */
   margin-top: auto;
   align-self: flex-start;
   text-decoration: none;

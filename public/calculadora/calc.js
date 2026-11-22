@@ -124,13 +124,13 @@ function buildMarks(){
   const HEAD={dmg:'Dano',xp:'XP',cc:'Crít.',cd:'D.crít.',ds:'Defesa',sp:'Vel. atq.'};
   t.innerHTML='<tr><th>Monstro</th>'+MARK_TYPES.map(ty=>`<th>${HEAD[ty]}<small class="th-sub">+${MARK[ty].slice(1).join(' / ').replaceAll('.',',')}%</small></th>`).join('')+'<th>Etapa</th></tr>';
   monsKeys().forEach(m=>{
-    const tr=document.createElement('tr'); tr.innerHTML=`<td>${nm(m)}</td>`;
+    const tr=document.createElement('tr'); tr.innerHTML=`<td class="mark-name">${nm(m)}</td>`;
     MARK_TYPES.forEach(ty=>{
-      const td=document.createElement('td'); const s=document.createElement('select');
+      const td=document.createElement('td'); td.dataset.label=HEAD[ty]+' (+'+MARK[ty].slice(1).join('/').replaceAll('.',',')+'%)'; const s=document.createElement('select');
       s.innerHTML=MARK[ty].map((v,i)=>`<option value="${i}">${i===0?'—':'nv'+i}</option>`).join(''); s.value=sc.marks[m][ty];
       s.onchange=()=>{sc.marks[m][ty]=+s.value; updateMarks(); schedule()}; td.appendChild(s); tr.appendChild(td);
     });
-    const td=document.createElement('td'); const s=document.createElement('select');
+    const td=document.createElement('td'); td.dataset.label='Etapa'; const s=document.createElement('select');
     s.innerHTML=STAGEXP.map((v,i)=>`<option value="${i}">${i}${v?` (+${v}% XP)`:''}</option>`).join(''); s.value=sc.marks[m].stage; s.onchange=()=>{sc.marks[m].stage=+s.value;schedule()}; td.appendChild(s); tr.appendChild(td);
     t.appendChild(tr);
   });
