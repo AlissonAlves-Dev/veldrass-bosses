@@ -1,7 +1,8 @@
 // Regras fixas, classes e simulação da calculadora. Sem acesso ao DOM: é coberto por calc.test.mjs.
 const nm = k => NAMES[k] || (DATA.monsters[k]&&DATA.monsters[k].name) || k;
 const inm = k => ITEMNAMES[k] || k;
-const MARK = {dmg:[0,2,5,7], xp:[0,2,3,5], cc:[0,1,3,5], cd:[0,2,5,7]};
+const MARK = {dmg:[0,2,5,7], xp:[0,2,3,5], cc:[0,1,3,5], cd:[0,2,5,7], ds:[0,2,5,7], sp:[0,0.5,1,1.5]};
+const MARK_TYPES = ['dmg','xp','cc','cd','ds','sp'];
 const COST = [0,50,150,300];
 const STAGEXP = [0,0,2,3,4,5];
 const fmt = (n,d=0)=> isFinite(n)? n.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—';
@@ -24,25 +25,31 @@ const earned = () => Math.floor(Math.max(1,S.level)/RULES.levelsPerStep)*RULES.p
 // ---------- estado ----------
 const S = {
   cls:'wizard', level:111, weapon:231, petAtk:28, magic:83, magicBonus:11, dmgPct:0, critChance:7, critMult:181, atkSpeed:7,
+  petCrit:0, petCritDmg:0, petSpeed:0, petAtkSkill:0, petDefSkill:0,
   itemsDef:175, petDef:28, shield:83, shieldBonus:0, defPct:0,
   hunt:'forgotten_keep', huntEff:17.2, potionEff:0, amuletEff:0, observedKills:191, xpGlobal:0, lootRate:1, fragments:false,
   boostMon:'', boostXp:0, boostLoot:0, target:'throne_key', horizon:8,
   heal:70, stock:400, obsFoods:41,
+  parts:{}, partsOn:{}, // detalhe por equipamento (campo → slot → valor) e quais campos estão abertos
+  active:'A', // cenário ativo (o que o jogador usa hoje): base da calibração e das comparações
   A:{atk:0,def:20,hp:24,pas:0,marks:{}},
   B:{atk:44,def:0,hp:0,pas:0,marks:{}}
 };
 function monsKeys(){ return Object.keys(DATA.hunts[S.hunt].weights); }
-function emptyMarks(){ const o={}; monsKeys().forEach(m=>o[m]={dmg:0,xp:0,cc:0,cd:0,stage:0}); return o; }
-function resetMarks(){ S.A.marks=emptyMarks(); S.B.marks=emptyMarks(); const g=monsKeys().find(k=>k==='stone_golem'); if(g){ S.B.marks[g].dmg=1; S.B.marks[g].xp=2; } }
+function emptyMarks(){ const o={}; monsKeys().forEach(m=>o[m]={dmg:0,xp:0,cc:0,cd:0,ds:0,sp:0,stage:0}); return o; }
+// Marcas do Bestiário: um só conjunto, compartilhado pelos cenários A e B (mesmo objeto).
+function resetMarks(){ const m=emptyMarks(); S.A.marks=m; S.B.marks=m; }
 resetMarks();
 
 // ---------- simulação ----------
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function derive(sc){
   const c=CLS();
-  const skillMult = 1+RULES.skillPerLevel*(S.magic+S.magicBonus);
+  const skillMult = 1+RULES.skillPerLevel*(S.magic+S.magicBonus+Math.floor(S.petAtkSkill));
   const D = Math.round((S.weapon+S.petAtk+sc.atk)*skillMult*c.eff*(1+S.dmgPct/100));
-  const actionMs = Math.max(RULES.actionMinMs, Math.round(RULES.actionBaseMs*(1-S.atkSpeed/100)));
+  // sp = bônus de velocidade de ataque da marca do Bestiário (%), da espécie-alvo do encontro.
+  const actionMsFor = sp => Math.max(RULES.actionMinMs, Math.round(RULES.actionBaseMs*(1-(S.atkSpeed+S.petSpeed+sp)/100)));
+  const actionMs = actionMsFor(0);
   const eff = Math.min(RULES.maxEfficiency, S.huntEff+S.potionEff+S.amuletEff);
   const wait = Math.max(1, Math.ceil(RULES.searchBaseSec*(1-eff/100)));
   const passivePct = Math.min(100, c.passiva.chance+sc.pas*RULES.passivePerPoint);
@@ -50,25 +57,29 @@ function derive(sc){
   const mitig = c.passiva.tipo==='block' ? 0.5*passivePct/100 : (c.passiva.tipo==='dodge' ? passivePct/100 : 0);
   const hpBase = c.hpBase + c.hpLvl*(Math.max(1,S.level)-1);
   const maxHp = hpBase+sc.hp*RULES.hpPerPoint;
-  const shieldMult = 1+RULES.skillPerLevel*(S.shield+S.shieldBonus);
-  const effDef = Math.floor((S.itemsDef+sc.def+S.petDef)*(1+S.defPct/100)*shieldMult);
-  return {D,skillMult,actionMs,wait,p,passivePct,mitig,hpBase,maxHp,effDef,eff};
+  const shieldMult = 1+RULES.skillPerLevel*(S.shield+S.shieldBonus+Math.floor(S.petDefSkill));
+  // ds = bônus de defesa % da marca do Bestiário contra a espécie que ataca.
+  const effDefFor = ds => Math.floor((S.itemsDef+sc.def+S.petDef)*(1+(S.defPct+ds)/100)*shieldMult);
+  const effDef = effDefFor(0);
+  return {D,skillMult,actionMs,actionMsFor,effDefFor,wait,p,passivePct,mitig,hpBase,maxHp,effDef,eff};
 }
 function simulate(sc, N=30000){
   const dv=derive(sc), H=DATA.hunts[S.hunt], keys=Object.keys(H.weights), tw=keys.reduce((a,k)=>a+H.weights[k],0);
   const rnd=mulberry32(20261120);
   const pick=()=>{let r=rnd()*tw;for(const k of keys){r-=H.weights[k];if(r<0)return k}return keys[keys.length-1]};
-  const mk=m=>sc.marks[m]||{dmg:0,xp:0,cc:0,cd:0,stage:0};
-  let acts=0, attacks=0; const kills=Object.fromEntries(keys.map(k=>[k,0]));
+  const mk=m=>sc.marks[m]||{dmg:0,xp:0,cc:0,cd:0,ds:0,sp:0,stage:0};
+  let acts=0, actSec=0, attacks=0; const kills=Object.fromEntries(keys.map(k=>[k,0]));
   for(let t=0;t<N;t++){
     const n=RULES.encounterMin+Math.floor(rnd()*(RULES.encounterMax-RULES.encounterMin+1)); const ms=Array.from({length:n},pick); const hp=ms.map(m=>DATA.monsters[m].hp);
+    // A duração da ação é fixada pela espécie do primeiro monstro do encontro (BattleQueueService).
+    const actMs=dv.actionMsFor(MARK.sp[mk(ms[0]).sp]);
     while(hp.some(h=>h>0)){
-      acts++;
+      acts++; actSec+=actMs/1000;
       const i=hp.findIndex(h=>h>0), pm=mk(ms[i]);
       const hit=rnd()<RULES.hit;
-      const cc=S.critChance/100+MARK.cc[pm.cc]/100;
+      const cc=(S.critChance+S.petCrit)/100+MARK.cc[pm.cc]/100;
       const isc=hit&&rnd()<cc;
-      const dmg=isc?Math.round(dv.D*(S.critMult/100+MARK.cd[pm.cd]/100)):dv.D;
+      const dmg=isc?Math.round(dv.D*((S.critMult+S.petCritDmg)/100+MARK.cd[pm.cd]/100)):dv.D;
       if(hit) hp[i]=Math.max(0,hp[i]-Math.round(dmg*(1+MARK.dmg[pm.dmg]/100)));
       if(rnd()<dv.p){ for(let k=0;k<hp.length;k++) if(k!==i&&hp[k]>0) hp[k]=Math.max(0,hp[k]-Math.round(dmg*(1+MARK.dmg[mk(ms[k]).dmg]/100))); }
       attacks+=hp.filter(h=>h>0).length;
@@ -76,15 +87,15 @@ function simulate(sc, N=30000){
     ms.forEach(m=>kills[m]++);
   }
   const A=acts/N, killsPerEnc=Object.fromEntries(keys.map(k=>[k,kills[k]/N]));
-  return {dv, actsPerEnc:A, attacksPerEnc:attacks/N, killsPerEnc};
+  return {dv, actsPerEnc:A, actSecPerEnc:actSec/N, attacksPerEnc:attacks/N, killsPerEnc};
 }
 function metrics(sc, overhead){
   const r=simulate(sc), dv=r.dv, keys=Object.keys(r.killsPerEnc);
-  const cycle = dv.wait + overhead + r.actsPerEnc*dv.actionMs/1000;
+  const cycle = dv.wait + overhead + r.actSecPerEnc;
   const encH=3600/cycle;
   let xp=0, gold=0, loot=0, lootFrag=0; const dropRate={};
   keys.forEach(m=>{
-    const mon=DATA.monsters[m], mark=sc.marks[m]||{dmg:0,xp:0,cc:0,cd:0,stage:0}, kpe=r.killsPerEnc[m];
+    const mon=DATA.monsters[m], mark=sc.marks[m]||{dmg:0,xp:0,cc:0,cd:0,ds:0,sp:0,stage:0}, kpe=r.killsPerEnc[m];
     const boosted = S.boostMon===m;
     const xpMult = 1+(S.xpGlobal+STAGEXP[mark.stage]+MARK.xp[mark.xp]+(boosted?S.boostXp:0))/100;
     xp += kpe*mon.xp*xpMult;
@@ -101,13 +112,13 @@ function metrics(sc, overhead){
   return {dv, r, cycle, encH, killsH:encH*killsPerEnc, xpH:encH*xp, goldH:encH*gold, lootH:encH*loot, fragH:encH*lootFrag,
           totalGoldH:encH*(gold+loot+(S.fragments?lootFrag:0)), attacksH:encH*r.attacksPerEnc*(1-dv.mitig), tgtH:tgt};
 }
-function marksCost(sc){ let c=0; Object.values(sc.marks).forEach(m=>['dmg','xp','cc','cd'].forEach(t=>c+=COST[m[t]])); return c; }
+function marksCost(sc){ let c=0; Object.values(sc.marks).forEach(m=>MARK_TYPES.forEach(t=>c+=COST[m[t]])); return c; }
 function marksWarnings(sc){
   const w=[], seen={};
   Object.entries(sc.marks).forEach(([m,v])=>{
-    const n=['dmg','xp','cc','cd'].filter(t=>v[t]>0).length; if(n>2) w.push(`${nm(m)} tem ${n} marcas (máximo 2).`);
-    ['dmg','xp','cc','cd'].forEach(t=>{ if(v[t]>0){ const key=t+v[t]; if(seen[key]) w.push(`Marca ${labelOf(t)} nível ${v[t]} já está em ${nm(seen[key])} (cada marca é única).`); seen[key]=m; }});
+    const n=MARK_TYPES.filter(t=>v[t]>0).length; if(n>2) w.push(`${nm(m)} tem ${n} marcas (máximo 2).`);
+    MARK_TYPES.forEach(t=>{ if(v[t]>0){ const key=t+v[t]; if(seen[key]) w.push(`Marca ${labelOf(t)} nível ${v[t]} já está em ${nm(seen[key])} (cada marca é única).`); seen[key]=m; }});
   });
   return w;
 }
-const labelOf=t=>({dmg:'Dano',xp:'XP',cc:'Chance crít.',cd:'Dano crít.'})[t];
+const labelOf=t=>({dmg:'Dano',xp:'XP',cc:'Chance crít.',cd:'Dano crít.',ds:'Defesa',sp:'Vel. ataque'})[t];

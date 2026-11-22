@@ -12,12 +12,14 @@
 
 .calc-hero { margin-bottom: 18px; }
 .calc-hero .command-actions { grid-column: 1 / -1; }
+.calc-hero .calc-hero-note { grid-column: 1 / -1; margin: 0; }
 .calc-hero h1 { font-size: clamp(1.9rem, 4.4vw, 3rem); }
 .calc-hero .next-meta { max-width: 720px; }
 
 .calc-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  /* 2 colunas fixas: os blocos "wide" ocupam as duas, e os cenários A e B dividem a largura toda. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: start;
 }
@@ -56,8 +58,13 @@
   grid-template-columns: 1fr 96px;
   gap: 6px 12px;
   align-items: center;
-  margin: 6px 0;
+  margin: 2px 0;
+  padding: 0 0 0 10px; /* sem folga vertical nem à direita: a linha tem a altura do campo e termina nele */
+  border-radius: 10px;
 }
+/* Linhas alternadas (classe .alt posta por stripe() em calc.js) para o olho não se perder entre nome e campo. */
+.row.alt { background: rgba(255, 255, 255, 0.055); }
+.row:hover { background: rgba(212, 175, 90, 0.10); }
 
 .row label { color: var(--muted); font-size: 0.9rem; }
 
@@ -79,6 +86,19 @@
 .calc-page input:focus-visible,
 .calc-page select:focus-visible { outline: 2px solid var(--gold-soft); outline-offset: 1px; }
 
+.sc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 34px; margin-bottom: 12px; }
+.sc-head h2 { margin: 0; }
+.sc-activate { min-height: 0; padding: 6px 12px; font-size: 0.78rem; line-height: 1.2; }
+.partlabel { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.partlabel:hover { color: var(--gold-soft); }
+.parts { margin: -2px 0 10px 4px; padding-left: 12px; border-left: 2px solid var(--line); }
+.parts[hidden] { display: none; }
+.parts .row label { font-size: 0.84rem; }
+input[readonly] { opacity: 0.8; }
+.pet-sep { display: flex; align-items: center; gap: 10px; margin: 18px 0 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.pet-sep span { color: var(--gold); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.big { margin: 4px 0; font-size: 1.6rem; font-weight: 800; color: var(--entry); }
+.calc-grid tr.sel td { background: rgba(255, 255, 255, 0.06); font-weight: 700; }
 .hint { margin: 8px 0 0; color: #7f8e9c; font-size: 0.8rem; }
 
 .calc-grid table { width: 100%; border-collapse: collapse; }
@@ -132,6 +152,7 @@ details summary { cursor: pointer; color: var(--gold-soft); font-weight: 700; }
 .rules td { padding: 5px 10px; font-size: 0.86rem; }
 
 @media (max-width: 760px) {
+  .calc-grid { grid-template-columns: minmax(0, 1fr); }
   .calc-grid > section { padding: 18px 16px; border-radius: 14px; }
   .row { grid-template-columns: 1fr 88px; }
   .calc-grid th, .calc-grid td { padding: 7px 6px; font-size: 0.84rem; }
