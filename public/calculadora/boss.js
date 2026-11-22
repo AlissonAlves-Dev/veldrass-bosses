@@ -3,22 +3,22 @@
 const BOSS_BATTLE_SEC = 600; // battle_duration_minutes = 10 para todos os bosses
 const BOSSES = {
   darius_blackmane: {name:'Darius Blackmane', level:10, maxHp:10000, basic:{target:'all', ms:3000, dmg:4}},
-  gorak_the_hunter: {name:'Gorak the Hunter', level:20, maxHp:20000, basic:{target:'all', ms:3500, dmg:56}},
+  gorak_the_hunter: {name:'Gorak, o Caçador', level:20, maxHp:20000, basic:{target:'all', ms:3500, dmg:56}},
   varkhan_blackblade: {name:'Varkhan Blackblade', level:30, maxHp:30000, basic:{target:'single', ms:2000, dmg:119}, area:{ms:8000, dmg:119}},
-  morvanna_swamp_witch: {name:'Morvanna, Lady of the Mire', level:45, maxHp:40000, basic:{target:'all', ms:4500, dmg:230},
+  morvanna_swamp_witch: {name:'Morvanna, Senhora do Lamaçal', level:45, maxHp:40000, basic:{target:'all', ms:4500, dmg:230},
     effect:{tipo:'Veneno', chance:0.18, dmg:1, ms:5000, sec:300}},
-  azrakar_the_abyssal: {name:'Azrakar, the Abyssal One', level:70, maxHp:50000, basic:{target:'single', ms:2000, dmg:392}, area:{ms:5000, dmg:392},
+  azrakar_the_abyssal: {name:'Azrakar, o Abissal', level:70, maxHp:50000, basic:{target:'single', ms:2000, dmg:392}, area:{ms:5000, dmg:392},
     effect:{tipo:'Fogo', chance:0.12, dmg:2, ms:5000, sec:300}}
 };
 const FOODS = {
-  apple:{name:'Apple', heal:5}, cheese:{name:'Cheese', heal:8},
-  cooked_minnow:{name:'Cooked Minnow', heal:10}, cooked_trout:{name:'Cooked Trout', heal:15}, cooked_salmon:{name:'Cooked Salmon', heal:20},
-  cooked_catfish:{name:'Cooked Catfish', heal:25}, cooked_sturgeon:{name:'Cooked Sturgeon', heal:30}, cooked_tuna:{name:'Cooked Tuna', heal:35},
-  cooked_pike:{name:'Cooked Pike', heal:45}, cooked_barracuda:{name:'Cooked Barracuda', heal:50}, cooked_carp:{name:'Cooked Carp', heal:60},
-  cooked_perch:{name:'Cooked Perch', heal:70}
+  apple:{name:'Maçã', heal:5}, cheese:{name:'Queijo', heal:8},
+  cooked_minnow:{name:'Peixinho cozido', heal:10}, cooked_trout:{name:'Truta cozida', heal:15}, cooked_salmon:{name:'Salmão cozido', heal:20},
+  cooked_catfish:{name:'Bagre cozido', heal:25}, cooked_sturgeon:{name:'Esturjão cozido', heal:30}, cooked_tuna:{name:'Atum cozido', heal:35},
+  cooked_pike:{name:'Lúcio cozido', heal:45}, cooked_barracuda:{name:'Barracuda cozida', heal:50}, cooked_carp:{name:'Carpa cozida', heal:60},
+  cooked_perch:{name:'Perca cozida', heal:70}
 };
 [BOSSES, FOODS].forEach(deepFreeze);
-Object.assign(S, {bossKey:'azrakar_the_abyssal', bossFood:'cooked_perch', bossN:10, bossSc:'A'});
+Object.assign(S, {bossKey:'azrakar_the_abyssal', huntFood:'cooked_perch', obsFood:'cooked_perch', heal:70, bossN:10, bossSc:'A'});
 
 // Dano depois da defesa (CombatDefenseService::damageAfterDefense), esperado sobre o sorteio uniforme.
 function bossHitAfterDefense(atk, def){
@@ -37,6 +37,14 @@ function bossHitDamage(atk, dv){
   if(c.passiva.tipo==='block') return (1-q)*f(atk)+q*f(Math.ceil(atk/2));
   if(c.passiva.tipo==='dodge') return (1-q)*f(atk);
   return f(atk);
+}
+// Dano que o jogador recebe por hora na caçada: ataques de cada espécie por encontro × dano de um golpe (defesa com a marca da espécie, passiva e multiplicador da classe) × encontros por hora.
+function huntDamageH(sc, m){
+  let d=0;
+  Object.entries(m.r.attacksBy).forEach(([k,n])=>{ const mark=sc.marks[k]||{ds:0};
+    const dvm=Object.assign({}, m.dv, {effDef:m.dv.effDefFor(MARK.ds[mark.ds||0])});
+    d+=n*bossHitDamage(DATA.monsters[k].attack, dvm); });
+  return d*m.encH;
 }
 // Quantas comidas gastar numa luta de 10 min. Cada comida só é usada quando falta HP >= cura, então a conta é dano total ÷ cura.
 function bossFoodNeeded(bossKey, sc, n, foodKey){

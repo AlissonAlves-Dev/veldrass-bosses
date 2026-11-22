@@ -68,7 +68,7 @@ function renderClassCard(a,b){
   const pr=document.getElementById('ptsresult');
   if(pr) pr.innerHTML='<h2>Resultado com seus pontos (calculado)</h2><table class="fixed"><tr><th></th><th>'+scLabel('A')+'</th><th>'+scLabel('B')+'</th></tr>'
    +'<tr><td>Passiva efetiva</td><td>'+pct(a.passivePct)+'</td><td>'+pct(b.passivePct)+'</td></tr>'
-   +'<tr><td>Mitigação de dano ('+extra+')</td><td>'+mit(a.mitig)+'</td><td>'+mit(b.mitig)+'</td></tr>'
+   +(c.passiva.tipo==='splash'?'':'<tr><td>Mitigação de dano ('+extra+')</td><td>'+mit(a.mitig)+'</td><td>'+mit(b.mitig)+'</td></tr>')
    +'<tr><td>Dano por golpe</td><td>'+fmt(a.D)+'</td><td>'+fmt(b.D)+'</td></tr>'
    +'<tr><td>HP máximo</td><td>'+fmt(a.maxHp)+'</td><td>'+fmt(b.maxHp)+'</td></tr>'
    +'<tr><td>Defesa efetiva</td><td>'+fmt(a.effDef)+'</td><td>'+fmt(b.effDef)+'</td></tr></table>';
@@ -91,10 +91,12 @@ function buildHunt(){
   const drops=new Set(); monsKeys().forEach(m=>DATA.monsters[m].drops.forEach(d=>drops.add(d.key)));
   const t=document.createElement('div'); t.className='row'; t.style.gridTemplateColumns='1fr 1fr'; t.innerHTML='<label>Item alvo (ex.: chave)</label>';
   const ts=document.createElement('select'); ts.innerHTML=[...drops].map(k=>`<option value="${k}">${inm(k)}</option>`).join(''); ts.value=S.target; ts.onchange=()=>{S.target=ts.value;schedule()}; t.appendChild(ts); el.appendChild(t);
-  numRow(el,'Horizonte do item alvo (h)','horizon');
+  numRow(el,'Tempo de caçada para a chance do item (h)','horizon');
   const f=document.createElement('div'); f.className='row'; f.style.gridTemplateColumns='1fr auto';
   f.innerHTML='<label>Contar fragmentos de fusão no ouro/h (loteria)</label>'; const c=document.createElement('input'); c.type='checkbox'; c.checked=S.fragments; c.style.width='auto'; c.onchange=()=>{S.fragments=c.checked;schedule()}; f.appendChild(c); el.appendChild(f);
-  [['Cura da comida (perca = 70)','heal'],['Estoque de comida','stock'],['Comidas/h observadas hoje (cenário ativo)','obsFoods']].forEach(a=>numRow(el,a[0],a[1]));
+  selRow(el,'Comida que você usa (caçada e boss)','huntFood',Object.entries(FOODS).map(([k,f])=>[k,f.name+' (cura '+f.heal+')']),()=>{ S.heal=FOODS[S.huntFood].heal; });
+  [['Estoque de comida','stock'],['Comidas/h que você gasta (calibra a estimativa; 0 = só o modelo)','obsFoods']].forEach(a=>numRow(el,a[0],a[1]));
+  selRow(el,'Comida que você usava ao medir as comidas/h','obsFood',Object.entries(FOODS).map(([k,f])=>[k,f.name+' (cura '+f.heal+')']));
   const h=document.createElement('p'); h.className='hint'; h.textContent='Espera entre encontros = 30 s × (1 − eficiência), arredondada para cima. Caçada máxima: 8 h.'; el.appendChild(h); stripe(el);
 }
 function fixTarget(){ const drops=new Set(); monsKeys().forEach(m=>DATA.monsters[m].drops.forEach(d=>drops.add(d.key))); if(!drops.has(S.target)) S.target=[...drops].find(k=>/key/.test(k))||[...drops][0]; }
@@ -112,19 +114,20 @@ function buildScenario(id){
   const pts=document.createElement('div'); pts.className='pts'; pts.id='ptsinfo'+id; el.appendChild(pts);
   const w=document.createElement('div'); w.id='warn'+id; el.appendChild(w);
 
-  updatePts(id); stripe(el);
+  updatePts(id); /* atributos: todas as linhas com a mesma cor (sem listras alternadas) */
 }
 function buildMarks(){
   const el=document.getElementById('marksbox'); if(!el) return; el.innerHTML='<h2>Marcas do Bestiário (nível 0–3) e etapa</h2>';
   const sc=S.A; // as marcas são as mesmas nos cenários A e B (S.A.marks === S.B.marks)
   const pts=document.createElement('div'); pts.className='pts'; pts.id='marksinfo'; el.appendChild(pts);
   const t=document.createElement('table'); t.className='mark';
-  t.innerHTML='<tr><th>Monstro</th><th>Dano</th><th>XP</th><th>Crít.</th><th>D.crít.</th><th>Defesa</th><th>Vel. atq.</th><th>Etapa</th></tr>';
+  const HEAD={dmg:'Dano',xp:'XP',cc:'Crít.',cd:'D.crít.',ds:'Defesa',sp:'Vel. atq.'};
+  t.innerHTML='<tr><th>Monstro</th>'+MARK_TYPES.map(ty=>`<th>${HEAD[ty]}<small class="th-sub">+${MARK[ty].slice(1).join(' / ').replaceAll('.',',')}%</small></th>`).join('')+'<th>Etapa</th></tr>';
   monsKeys().forEach(m=>{
     const tr=document.createElement('tr'); tr.innerHTML=`<td>${nm(m)}</td>`;
     MARK_TYPES.forEach(ty=>{
       const td=document.createElement('td'); const s=document.createElement('select');
-      s.innerHTML=MARK[ty].map((v,i)=>`<option value="${i}">${i===0?'—':'nv'+i+' (+'+v+'%)'}</option>`).join(''); s.value=sc.marks[m][ty];
+      s.innerHTML=MARK[ty].map((v,i)=>`<option value="${i}">${i===0?'—':'nv'+i}</option>`).join(''); s.value=sc.marks[m][ty];
       s.onchange=()=>{sc.marks[m][ty]=+s.value; updateMarks(); schedule()}; td.appendChild(s); tr.appendChild(td);
     });
     const td=document.createElement('td'); const s=document.createElement('select');
@@ -159,10 +162,11 @@ function render(){
   let overhead=0;
   if(S.observedKills>0){ const kpe=Object.values(rA.killsPerEnc).reduce((a,b)=>a+b,0); overhead=3600/(S.observedKills/kpe)-dvA.wait-rA.actSecPerEnc; }
   const A=metrics(S.A,overhead), B=metrics(S.B,overhead);
-  const M={A,B}, food={[act]:S.obsFoods,[oth]:S.obsFoods*(M[oth].attacksH/M[act].attacksH)}, foodA=food.A, foodB=food.B;
+  // Comida: dano recebido por hora ÷ cura da comida escolhida. Se o usuário informar quantas comidas gasta (campo opcional), o dano é calibrado pelo cenário ativo.
+  const M={A,B}, dmgRaw={A:huntDamageH(S.A,A),B:huntDamageH(S.B,B)}, heal=FOODS[S.huntFood].heal;
+  const calib=(S.obsFoods>0&&dmgRaw[act]>0)?S.obsFoods*FOODS[S.obsFood].heal/dmgRaw[act]:1;
+  const dmgH={A:dmgRaw.A*calib,B:dmgRaw.B*calib}, foodsOf=(sc,fk)=>dmgH[sc]/FOODS[fk].heal, foodA=foodsOf('A',S.huntFood), foodB=foodsOf('B',S.huntFood);
   const rows=[
-   ['Dano por golpe (sem crítico)',A.dv.D,B.dv.D,0,false],
-   ['Chance de splash % (só Mago)',A.dv.p*100,B.dv.p*100,1,false],
    ['Ações por encontro',A.r.actsPerEnc,B.r.actsPerEnc,2,true],
    ['Ciclo por encontro (s)',A.cycle,B.cycle,1,true],
    ['Abates/h',A.killsH,B.killsH,0,false],
@@ -170,11 +174,10 @@ function render(){
    ['Ouro solto/h',A.goldH,B.goldH,0,false],
    ['Loot vendido ao NPC/h'+(S.fragments?' (com fragmentos)':''),A.lootH+(S.fragments?A.fragH:0),B.lootH+(S.fragments?B.fragH:0),0,false],
    ['Ouro total/h',A.totalGoldH,B.totalGoldH,0,false],
-   [`${inm(S.target)} por hora`,A.tgtH,B.tgtH,4,false],
    [`Horas esperadas por ${inm(S.target)}`,1/A.tgtH,1/B.tgtH,1,true],
    [`Chance de ≥1 ${inm(S.target)} em ${S.horizon} h`,(1-Math.exp(-A.tgtH*S.horizon))*100,(1-Math.exp(-B.tgtH*S.horizon))*100,0,false,'%'],
-   ['HP máximo',A.dv.maxHp,B.dv.maxHp,0,false],
-   ['Comidas/h (estimativa)',foodA,foodB,1,true],
+   ['Dano recebido/h (estimativa)',dmgH.A,dmgH.B,0,true],
+   ['Comidas/h ('+FOODS[S.huntFood].name+')',foodA,foodB,1,true],
   ];
   let h='<table><tr><th></th><th>'+scLabel('A')+'</th><th>'+scLabel('B')+'</th><th>Δ inativo vs ativo</th></tr>';
   rows.forEach(r=>{ h+=`<tr><td>${r[0]}</td><td>${fmt(r[1],r[3])}${r[5]||''}</td><td>${fmt(r[2],r[3])}${r[5]||''}</td>${act==='A'?delta(r[1],r[2],r[4]):delta(r[2],r[1],r[4])}</tr>`; });
@@ -186,13 +189,16 @@ function render(){
    <tr><td>XP</td><td>${fmt(oA.xp)}</td><td>${fmt(oB.xp)}</td></tr>
    <tr><td>Ouro (solto + loot NPC)</td><td>${fmt(oA.gold)}</td><td>${fmt(oB.gold)}</td></tr>
    <tr><td>Abates</td><td>${fmt(oA.kills)}</td><td>${fmt(oB.kills)}</td></tr>
-   <tr><td>Comidas necessárias (estoque: ${fmt(S.stock)})</td><td class="${oA.food>S.stock?'neg':''}">${fmt(oA.food)}</td><td class="${oB.food>S.stock?'neg':''}">${fmt(oB.food)}</td></tr>
-   <tr><td>Horas de comida no estoque</td><td>${fmt(S.stock/foodA,1)}</td><td>${fmt(S.stock/foodB,1)}</td></tr></table>`;
+   <tr><td>Horas de comida no estoque</td><td>${foodA>0?fmt(S.stock/foodA,1):'—'}</td><td>${foodB>0?fmt(S.stock/foodB,1):'—'}</td></tr></table>`;
+  h+='<h3>Comidas gastas em 8 h, por tipo de comida</h3><table><tr><th>Comida</th><th>Cura</th><th>A</th><th>B</th></tr>';
+  Object.entries(FOODS).forEach(([k,fd])=>{ const a=foodsOf('A',k)*RULES.maxHuntHours, b=foodsOf('B',k)*RULES.maxHuntHours;
+    h+=`<tr${k===S.huntFood?' class="sel"':''}><td>${fd.name}</td><td>${fd.heal}</td><td>${fmt(Math.ceil(a))}</td><td>${fmt(Math.ceil(b))}</td></tr>`; });
+  h+='</table>';
   // defesa
   h+='<h3>Defesa efetiva vs. ataque dos monstros (com a marca de defesa de cada um)</h3><table><tr><th>Monstro</th><th>Ataque</th><th>A: def '+fmt(A.dv.effDef)+'</th><th>B: def '+fmt(B.dv.effDef)+'</th></tr>';
   const reg=(def,atk)=>{ if(def>=2*atk) return `<span class="good">0–1 por golpe</span>`; if(def<atk) return `<span class="warn">pesado (~${fmt(Math.ceil((atk-def*0.975)*CLS().taken))}/golpe)</span>`; const leak=Math.ceil(0.05*atk)*(2*atk-def)/atk; return `vazamento ~${fmt(Math.ceil(leak*CLS().taken))}/golpe`; };
   monsKeys().forEach(m=>{ const a=DATA.monsters[m].attack, ds=MARK.ds[S.A.marks[m].ds]; h+=`<tr><td>${nm(m)}</td><td>${a}</td><td>${reg(A.dv.effDefFor(ds),a)}</td><td>${reg(B.dv.effDefFor(ds),a)}</td></tr>`; });
-  h+='</table><p class="hint">Calibração: espera extra por ciclo (latência, preparo) = '+fmt(overhead,1)+' s, ajustada para o cenário ativo ('+act+') bater com os seus '+fmt(S.observedKills)+' abates/h. Comidas/h do cenário inativo = comidas/h do ativo × (ataques sofridos inativo ÷ ativo).</p>';
+  h+='</table><p class="hint">Calibração: espera extra por ciclo (latência, preparo) = '+fmt(overhead,1)+' s, ajustada para o cenário ativo ('+act+') bater com os seus '+fmt(S.observedKills)+' abates/h. Comidas = dano recebido por hora ÷ cura da comida escolhida (um ataque por monstro vivo a cada ação sua, com defesa, passiva e "dano recebido" da classe). Com as comidas/h em 0, vale só a estimativa do modelo.</p>';
   document.querySelector('#results').innerHTML='<h2>Resultado</h2>'+h;
   // golpes para matar
   let g='<table><tr><th>Monstro</th><th>HP</th><th>Peso</th><th>A: golpes</th><th>A: falta p/ −1 golpe</th><th>B: golpes</th><th>B: falta p/ −1 golpe</th></tr>';
@@ -209,8 +215,8 @@ function render(){
   document.querySelector('#hits').innerHTML='<h2>Golpes para matar cada monstro</h2>'+g; renderBoss(); saveState();
 }
 const STORE='veldrass-calc-v1';
-const EDITABLE=['cls','level','weapon','petAtk','magic','magicBonus','dmgPct','critChance','critMult','atkSpeed','itemsDef','petDef','petCrit','petCritDmg','petSpeed','petAtkSkill','petDefSkill','shield','shieldBonus','defPct','hunt','huntEff','potionEff','amuletEff','observedKills','xpGlobal','lootRate','fragments','boostMon','boostXp','boostLoot','target','horizon','heal','stock','obsFoods','bossN'];
-const BOSS_STR={bossKey:BOSSES,bossFood:FOODS,bossSc:{A:1,B:1},active:{A:1,B:1}};
+const EDITABLE=['cls','level','weapon','petAtk','magic','magicBonus','dmgPct','critChance','critMult','atkSpeed','itemsDef','petDef','petCrit','petCritDmg','petSpeed','petAtkSkill','petDefSkill','shield','shieldBonus','defPct','hunt','huntEff','potionEff','amuletEff','observedKills','xpGlobal','lootRate','fragments','boostMon','boostXp','boostLoot','target','horizon','stock','obsFoods','bossN'];
+const BOSS_STR={bossKey:BOSSES,huntFood:FOODS,obsFood:FOODS,bossSc:{A:1,B:1},active:{A:1,B:1}};
 function snapshot(){ const o={}; EDITABLE.forEach(k=>o[k]=S[k]); Object.keys(BOSS_STR).forEach(k=>o[k]=S[k]); o.marks=S.A.marks; o.parts=S.parts; o.partsOn=S.partsOn; ['A','B'].forEach(id=>{const s=S[id]; o[id]={atk:s.atk,def:s.def,hp:s.hp,pas:s.pas};}); return o; }
 function applyState(o){
   if(!o||typeof o!=='object') return;
@@ -233,6 +239,7 @@ function applyState(o){
   ['A','B'].forEach(id=>{ const s=o[id]; if(!s||typeof s!=='object') return;
     ['atk','def','hp','pas'].forEach(k=>{ const n=parseInt(s[k]); if(isFinite(n)&&n>=0&&n<=10000) S[id][k]=n; }); });
   Object.keys(BOSS_STR).forEach(k=>{ if(typeof o[k]==='string'&&Object.prototype.hasOwnProperty.call(BOSS_STR[k],o[k])) S[k]=o[k]; });
+  S.heal=FOODS[S.huntFood].heal;
   fixTarget();
 }
 const encodeState=()=>btoa(unescape(encodeURIComponent(JSON.stringify(snapshot()))));
@@ -268,22 +275,22 @@ function renderRules(){
 }
 
 // ---------- comida para world boss ----------
-function selRow(parent,label,key,opts){
+function selRow(parent,label,key,opts,onChange){
   const r=document.createElement('div'); r.className='row'; r.style.gridTemplateColumns='1fr 1fr'; r.innerHTML=`<label>${label}</label>`;
   const sel=document.createElement('select'); sel.innerHTML=opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join(''); sel.value=S[key];
-  sel.onchange=()=>{ S[key]=sel.value; schedule(); }; r.appendChild(sel); parent.appendChild(r);
+  sel.onchange=()=>{ S[key]=sel.value; if(onChange) onChange(); schedule(); }; r.appendChild(sel); parent.appendChild(r);
 }
 function buildBoss(){
   const el=document.getElementById('bossbox'); if(!el) return; el.innerHTML='<h2>Comida para World Boss</h2>';
   selRow(el,'Boss','bossKey',Object.entries(BOSSES).map(([k,b])=>[k,b.name+' (nível '+b.level+')']));
-  selRow(el,'Tipo de comida que você tem','bossFood',Object.entries(FOODS).map(([k,f])=>[k,f.name+' (cura '+f.heal+')']));
+  const fh=document.createElement('p'); fh.className='hint'; fh.textContent='Comida: a mesma escolhida em "Comida que você usa", na seção Caçada e bônus.'; el.appendChild(fh);
   selRow(el,'Cenário de defesa','bossSc',[['A','Cenário A'],['B','Cenário B']]);
   numRow(el,'Participantes no evento','bossN',1,1);
   const out=document.createElement('div'); out.id='bossout'; el.appendChild(out); stripe(el);
 }
 function renderBoss(){
   const out=document.getElementById('bossout'); if(!out) return;
-  const b=BOSSES[S.bossKey], f=FOODS[S.bossFood], r=bossFoodNeeded(S.bossKey,S.bossSc,S.bossN,S.bossFood);
+  const b=BOSSES[S.bossKey], f=FOODS[S.huntFood], r=bossFoodNeeded(S.bossKey,S.bossSc,S.bossN,S.huntFood);
   let h=`<p class="big">${fmt(r.qty)} × ${f.name}</p><p class="hint">para aguentar os ${BOSS_BATTLE_SEC/60} min de luta contra ${b.name}, com a defesa do cenário ${S.bossSc} (${fmt(r.dv.effDef)}) e HP máximo ${fmt(r.maxHp)}.</p>`;
   h+=`<table><tr><th>Dano esperado em ${BOSS_BATTLE_SEC/60} min</th><th>Valor</th></tr>
    <tr><td>Golpes que acertam você (~)</td><td>${fmt(r.hitsOnMe,1)}</td></tr>
@@ -292,7 +299,7 @@ function renderBoss(){
    +`<tr><td>Dano total</td><td>${fmt(r.total)}</td></tr></table>`;
   if(r.maxHit>=r.maxHp) h+='<div class="warn">Um único golpe pode tirar todo o seu HP: comida não adianta, aumente defesa ou vida.</div>';
   h+='<h3>Mesma luta com cada comida</h3><table><tr><th>Comida</th><th>Cura</th><th>Quantidade</th></tr>';
-  Object.entries(FOODS).forEach(([k,fd])=>{ h+=`<tr${k===S.bossFood?' class="sel"':''}><td>${fd.name}</td><td>${fd.heal}</td><td>${fmt(Math.ceil(r.total/fd.heal))}</td></tr>`; });
+  Object.entries(FOODS).forEach(([k,fd])=>{ h+=`<tr${k===S.huntFood?' class="sel"':''}><td>${fd.name}</td><td>${fd.heal}</td><td>${fmt(Math.ceil(r.total/fd.heal))}</td></tr>`; });
   h+=`</table><p class="hint">Estimativa. Golpes de alvo único acertam você em 1 de ${fmt(Math.max(1,Math.floor(S.bossN)||1))} (participantes); golpes em área acertam todos. Usa a defesa efetiva, a passiva e o "dano recebido" da classe. Não inclui comida do pet, resistência a veneno/fogo nem regeneração.</p>`;
   out.innerHTML=h;
 }

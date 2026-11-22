@@ -5,7 +5,8 @@ Não é um site oficial do jogo e não tem conexão com ele.
 
 **Site no ar:** https://veldrass-tools.vercel.app
 
-- **[Boss Watch](https://veldrass-tools.vercel.app/)** (`/`): horários e contagem regressiva dos world bosses, no horário de Brasília.
+- **[Página inicial](https://veldrass-tools.vercel.app/)** (`/`): resumo do jogo e dois botões para escolher a ferramenta.
+- **[Boss Watch](https://veldrass-tools.vercel.app/watch/)** (`/watch/`): horários e contagem regressiva dos world bosses, no horário de Brasília.
 - **[Calculadora de farm](https://veldrass-tools.vercel.app/calculadora/)** (`/calculadora/`): compara dois builds (atributos e marcas do Bestiário) por XP/h, ouro/h e horas por item.
 
 ## 1. Rodar no seu computador
@@ -26,7 +27,8 @@ Testes: `npm test`.
 
 | Arquivo | Responsabilidade |
 | --- | --- |
-| `public/index.html` | Página do Boss Watch |
+| `public/index.html`, `public/home.css` | Página inicial (resumo do jogo e escolha da ferramenta) |
+| `public/watch/index.html` | Página do Boss Watch |
 | `public/styles.css` | Tema e componentes compartilhados pelas duas páginas |
 | `public/bosses.js` | Nomes, níveis, locais e horários de referência dos bosses |
 | `public/app.js` | Ciclos, sincronização do horário, renderização do Boss Watch |
@@ -38,7 +40,7 @@ Testes: `npm test`.
 | `public/manifest.webmanifest`, `public/sw.js`, `public/icons/` | PWA: instalação e cache offline |
 | `api/time.js` | Função da Vercel que devolve a hora do servidor |
 | `server.mjs` | Servidor local de desenvolvimento |
-| `vercel.json` | Cabeçalhos de segurança e rota `/calculadora` |
+| `vercel.json` | Cabeçalhos de segurança e rotas `/watch` e `/calculadora` |
 | `cycle.test.mjs`, `calc.test.mjs` | Testes do ciclo dos bosses e da calculadora |
 
 ## 3. A regra do ciclo dos bosses
@@ -84,8 +86,6 @@ Corrija somente com uma nova referência real, observada no jogo.
 
 ## 4. Calculadora de farm
 
-> **Desativada para os usuários por enquanto.** O código continua em `public/calculadora/`, mas no site publicado `/calculadora` redireciona para `/`, o link saiu do menu e o service worker não a guarda em cache. Para reativar: restaurar o link em `public/index.html`, trocar os `redirects` do `vercel.json` pelo `rewrite` de `/calculadora` → `/calculadora/index.html` e voltar os arquivos da calculadora ao `APP_SHELL` do `public/sw.js` (subindo a versão do cache).
-
 - Compara dois cenários (A e B) para classe, atributos, marcas do Bestiário e caçada.
 - Os modificadores de classe e as regras do jogo (🔒) são fixos e congelados no código; só os dados do seu personagem são editáveis.
 - Os valores ficam salvos no navegador. "Copiar link com meus valores" gera um link com o seu cenário.
@@ -96,7 +96,7 @@ Corrija somente com uma nova referência real, observada no jogo.
 
 O site é publicado na Vercel em https://veldrass-tools.vercel.app a partir da pasta `public/`; a função `api/time.js` vira `/api/time` automaticamente.
 O endereço antigo `veldrass-bosses.vercel.app` redireciona para o atual.
-`vercel.json` acrescenta cabeçalhos de segurança e, enquanto a calculadora está desativada, redireciona `/calculadora` para `/`.
+`vercel.json` acrescenta cabeçalhos de segurança e faz `/watch` e `/calculadora` abrirem as páginas das ferramentas.
 O workflow antigo do GitHub Pages foi removido: o Pages não tem `/api/time`, então o site publicado por ele não conseguia sincronizar o horário.
 
 Para instalar como app (PWA) é preciso HTTPS, como na Vercel. O cache offline guarda os arquivos, mas **não** mantém o JavaScript rodando em segundo plano: navegadores e celulares podem suspender abas e atrasar temporizadores. Este código não envia notificações nem alarmes; isso exigiria um backend agendador com Web Push.

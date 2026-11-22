@@ -28,7 +28,7 @@
         </a>
 
         <nav class="site-nav" aria-label="Ferramentas">
-          <a href="/">Boss Watch</a>
+          <a href="/watch/">Boss Watch</a>
           <a href="/calculadora/" aria-current="page">Calculadora de farm</a>
         </nav>
       </header>
@@ -47,10 +47,8 @@
           <button id="btnReset" class="button button-muted" type="button">Restaurar padrões</button>
         </div>
         <p class="hint calc-hero-note">
-        <strong>Copiar link com meus valores:</strong> gera um endereço desta calculadora com tudo o que você
-        preencheu (classe, caçada, pontos e marcas dos builds A e B) e copia para a área de transferência.
-        Quem abrir o link vê exatamente os mesmos números. Os valores ficam só no endereço (depois do #),
-        sem envio a servidor. <strong>Restaurar padrões</strong> apaga os valores salvos neste navegador e recarrega a página.
+        O link leva a sua classe, caçada, pontos e marcas (A e B) no endereço, depois do #, sem enviar nada a servidor.
+        <strong>Restaurar padrões</strong> apaga os valores salvos neste navegador.
         </p>
       </section>
 
@@ -68,12 +66,15 @@
       </div>
 
       <footer>
-        <p>Ferramenta de fã para o <a href="https://veldrass.com" target="_blank" rel="noopener noreferrer">Veldrass</a>. Sem conexão com o jogo.</p>
-        <p>
-          Modelo: encontro de 1 a 3 monstros; o jogador ataca o primeiro vivo (95% de acerto); o splash (só Mago) repete o golpe nos outros vivos;
-          espera entre encontros = 30 s × (1 − eficiência de Caça). O ciclo é calibrado pelo seu "abates/h" do painel de Status.
-          Dados do config/game.php de 2026-11-20. Não modelado: morte do pet e falta de comida; o consumo de comida é uma estimativa proporcional aos ataques sofridos.
+        <p class="footer-note">
+          <span>Modelo: encontro de 1 a 3 monstros; o jogador ataca o primeiro vivo (95% de acerto); o splash (só Mago) repete o golpe nos outros vivos; espera entre encontros = 30 s × (1 − eficiência de Caça).</span>
+          <span>O ciclo é calibrado pelo seu "abates/h" do painel de Status. Dados do config/game.php de 2026-11-20.</span>
+          <span>Não modelado: morte do pet e falta de comida; o consumo de comida é uma estimativa a partir do dano recebido.</span>
         </p>
+        <div class="footer-row">
+          <p>Ferramenta de fã para o <a href="https://veldrass.com" target="_blank" rel="noopener noreferrer">Veldrass</a>. Sem conexão com o jogo.</p>
+          <p class="footer-contact">Contato: <a href="mailto:alissonalves.dev@gmail.com">alissonalves.dev@gmail.com</a></p>
+        </div>
       </footer>
     </main>
 

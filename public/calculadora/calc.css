@@ -91,7 +91,7 @@
 .sc-activate { min-height: 0; padding: 6px 12px; font-size: 0.78rem; line-height: 1.2; }
 .partlabel { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .partlabel:hover { color: var(--gold-soft); }
-.parts { margin: -2px 0 10px 4px; padding-left: 12px; border-left: 2px solid var(--line); }
+.parts { margin: -2px 0 10px 4px; padding: 4px 0 4px 12px; border-left: 2px solid var(--line); border-radius: 0 10px 10px 0; background: rgba(214, 170, 90, 0.035); }
 .parts[hidden] { display: none; }
 .parts .row label { font-size: 0.84rem; }
 input[readonly] { opacity: 0.8; }
@@ -157,3 +157,11 @@ details summary { cursor: pointer; color: var(--gold-soft); font-weight: 700; }
   .row { grid-template-columns: 1fr 88px; }
   .calc-grid th, .calc-grid td { padding: 7px 6px; font-size: 0.84rem; }
 }
+
+/* Todas as linhas de campo com a mesma altura (número, lista e caixa de seleção). */
+.row { min-height: 38px; box-sizing: border-box; }
+.calc-page .row input:not([type="checkbox"]),
+.calc-page .row select { height: 36px; box-sizing: border-box; }
+
+/* Percentuais das marcas no cabeçalho da coluna. */
+.mark .th-sub { display: block; margin-top: 2px; color: var(--muted); font-size: 0.68rem; font-weight: 600; }

@@ -1,9 +1,7 @@
 {
-  "redirects": [
-    { "source": "/calculadora", "destination": "/", "permanent": false },
-    { "source": "/calculadora/", "destination": "/", "permanent": false },
-    { "source": "/calculadora/index.html", "destination": "/", "permanent": false },
-    { "source": "/calculadora/:path*", "destination": "/", "permanent": false }
+  "rewrites": [
+    { "source": "/watch", "destination": "/watch/index.html" },
+    { "source": "/calculadora", "destination": "/calculadora/index.html" }
   ],
   "headers": [
     {
