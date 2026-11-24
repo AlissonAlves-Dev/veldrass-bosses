@@ -191,3 +191,16 @@ details summary { cursor: pointer; color: var(--gold-soft); font-weight: 700; }
   .mark td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 0.84rem; }
   .mark td[data-label] select { width: 100%; }
 }
+
+/* ---------- Blocos "Avançado" (campos opcionais recolhidos) ---------- */
+.adv { margin: 12px 0 6px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.025); }
+.adv > summary { padding: 11px 14px; cursor: pointer; color: var(--gold-soft); font-weight: 700; font-size: 0.9rem; list-style: none; }
+.adv > summary::-webkit-details-marker { display: none; }
+.adv > summary::before { content: "▸ "; }
+.adv[open] > summary::before { content: "▾ "; }
+.adv > summary:hover { color: var(--ink); }
+.adv-body { padding: 2px 8px 10px; }
+.adv-section { margin: 0; border: 0; background: none; }
+.adv-section > summary { padding: 0; }
+.adv-section > summary h2 { display: inline; margin: 0; }
+.adv-section > .adv-body { padding: 10px 0 0; }
