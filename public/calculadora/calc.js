@@ -8,11 +8,25 @@ function advBox(parent,title){
   d.innerHTML='<summary>'+title+'</summary><div class="adv-body"></div>';
   parent.appendChild(d); return d.querySelector('.adv-body');
 }
-// Ao trocar raridade ou nível do pet, o ataque e a defesa que ele dá são recalculados (e continuam editáveis em Avançado).
-function applyPetBase(){
-  const b=petBaseStats(S.petRarity,S.petLevel); S.petAtk=b.atk; S.petDef=b.def;
-  ['petAtk','petDef'].forEach(k=>{ const i=document.querySelector('input[data-key="'+k+'"]'); if(i) i.value=S[k]; });
+// Pet: raridade, nível, estrelas e quais bônus ele tem. Ataque, defesa, crítico, velocidade e skills são calculados (applyPet).
+function renderPetBonuses(){
+  const box=document.getElementById('petbonus'); if(!box) return;
+  const p=PETS[S.petRarity]||PETS.none, eff=petEffLevel(), vals=petBonusValues(S.petRarity,eff,S.petKeys), full=S.petKeys.length>=p.bonusCount;
+  box.innerHTML='';
+  const info=document.createElement('p'); info.className='hint';
+  info.textContent=p.bonusCount?('Nível efetivo '+eff+'. Marque os '+p.bonusCount+' bônus que o seu pet '+p.nome.toLowerCase()+' tem ('+S.petKeys.length+'/'+p.bonusCount+').'):'Sem pet: não há bônus.';
+  box.appendChild(info);
+  Object.entries(PET_BONUS).forEach(([k,b])=>{
+    const on=S.petKeys.includes(k);
+    const row=document.createElement('label'); row.className='row pet-check';
+    const val=on?'+'+fmt(vals[k]||0,2)+b.unit:'';
+    row.innerHTML='<span>'+b.nome+'</span><span class="pet-val">'+val+'</span>';
+    const c=document.createElement('input'); c.type='checkbox'; c.checked=on; c.disabled=!p.bonusCount||(!on&&full);
+    c.onchange=()=>{ S.petKeys=c.checked?[...S.petKeys,k]:S.petKeys.filter(x=>x!==k); applyPet(); renderPetBonuses(); schedule(); };
+    row.appendChild(c); box.appendChild(row);
+  });
 }
+function petChanged(){ S.petStars=Number(S.petStars)||0; applyPet(); renderPetBonuses(); }
 function numRow(parent,label,key,step=1,min=0,suffix='',onChange=null){
   const row=document.createElement('div'); row.className='row';
   row.innerHTML=`<label>${label}</label>`;
@@ -59,11 +73,10 @@ function buildChar(){
    ['Dano crítico % (como no painel)','critMult'],['Velocidade de ataque %','atkSpeed',0.5]
   ].forEach(rowsIn(advBox(el,'Avançado: bônus e crítico do personagem')));
   const sep=document.createElement('div'); sep.className='pet-sep'; sep.innerHTML='<span>Pet equipado</span>'; el.appendChild(sep);
-  selRow(el,'Raridade do pet','petRarity',Object.entries(PETS).map(([k,p])=>[k,p.nome]),applyPetBase);
-  numRow(el,'Nível efetivo do pet (nível + 10 por estrela)','petLevel',1,0,'',applyPetBase);
-  [['Ataque do pet (automático pela raridade e nível)','petAtk'],['Defesa do pet (automática pela raridade e nível)','petDef'],['Chance de crítico do pet %','petCrit',0.1],['Dano crítico do pet %','petCritDmg',0.1],
-   ['Velocidade de ataque do pet %','petSpeed',0.1],['Skill de ataque do pet (níveis)','petAtkSkill'],['Skill de defesa do pet (níveis)','petDefSkill']
-  ].forEach(rowsIn(advBox(el,'Avançado: bônus do pet')));
+  selRow(el,'Raridade do pet','petRarity',Object.entries(PETS).map(([k,p])=>[k,p.nome]),petChanged);
+  numRow(el,'Nível do pet','petLevel',1,0,'',petChanged);
+  selRow(el,'Estrelas do pet','petStars',[0,1,2,3,4,5].map(n=>[String(n),n?'★'.repeat(n)+' ('+n+')':'Nenhuma']),petChanged);
+  const pb=document.createElement('div'); pb.id='petbonus'; el.appendChild(pb); renderPetBonuses();
   stripe(el);
 }
 const SHOW_ELITE=false; // classe elite ainda não existe no jogo; mude para true quando for lançada
@@ -183,7 +196,7 @@ function render(){
   const cfOf=(id,fk)=>{ const m=M[id], cf=countFoods(m.r,FOODS[fk].heal,m.dv.maxHp), pet=petFoodsOver(cf,m.encH*m.r.actsPerEnc,H);
     return {player:cf.player*m.encH, deaths:cf.playerDeaths*m.encH, petOver:pet.foods, petLifeH:pet.lifeHours, petLifeFoods:cf.petLifeEats}; };
   const foodsOf=(id,fk)=>{ const c=cfOf(id,fk); return {player:c.player, pet:c.petOver, total8:c.player*H+c.petOver, deaths:c.deaths, petLifeH:c.petLifeH, petLifeFoods:c.petLifeFoods}; };
-  const fA=foodsOf('A',S.huntFood), fB=foodsOf('B',S.huntFood), petOn=S.petRarity!=='none'&&S.petLevel>0;
+  const fA=foodsOf('A',S.huntFood), fB=foodsOf('B',S.huntFood), petOn=S.petRarity!=='none'&&petEffLevel()>0;
   const rows=[
    ['Ações por encontro',A.r.actsPerEnc,B.r.actsPerEnc,2,true],
    ['Ciclo por encontro (s)',A.cycle,B.cycle,1,true],
@@ -214,7 +227,7 @@ function render(){
   const warnF=(id,f)=>f.deaths>0?`<div class="warn">Cenário ${id}: com ${FOODS[S.huntFood].name} o personagem chegaria a 0 HP cerca de ${fmt(f.deaths,1)} vez(es) por hora. Escolha uma comida de cura maior.</div>`:'';
   h+=warnF('A',fA)+warnF('B',fB);
   if(petOn){ const petTxt=(id,f)=>isFinite(f.petLifeH)?`no cenário ${id} ele morre em ${f.petLifeH*60<1?'menos de 1 min':'~'+fmt(f.petLifeH*60)+' min'}, depois de ~${fmt(f.petLifeFoods,1)} comidas`:`no cenário ${id} ele aguenta toda a caçada`;
-    h+=`<p class="hint">Pet ${PETS[S.petRarity].nome} nível ${fmt(S.petLevel)} (vida ${fmt(A.r.petMaxHp)}, defesa ${fmt(S.petDef)}): ${petTxt('A',fA)}; ${petTxt('B',fB)}. Pet morto não volta na mesma caçada.</p>`; }
+    h+=`<p class="hint">Pet ${PETS[S.petRarity].nome} nível efetivo ${fmt(A.r.petEffLv)} (vida ${fmt(A.r.petMaxHp)}, defesa ${fmt(A.r.petOwnDef)}): ${petTxt('A',fA)}; ${petTxt('B',fB)}. Pet morto não volta na mesma caçada.</p>`; }
   h+='<h3>Comidas gastas em 8 h, por tipo de comida</h3><table><tr><th>Comida</th><th>Cura</th><th>A</th><th>B</th></tr>';
   Object.entries(FOODS).forEach(([k,fd])=>{ const a=foodsOf('A',k).total8, c=foodsOf('B',k).total8;
     h+=`<tr${k===S.huntFood?' class="sel"':''}><td>${fd.name}</td><td>${fd.heal}</td><td>${fmt(Math.ceil(a))}</td><td>${fmt(Math.ceil(c))}</td></tr>`; });
@@ -240,9 +253,9 @@ function render(){
   document.querySelector('#hits').innerHTML='<h2>Golpes para matar cada monstro</h2>'+g; renderBoss(); saveState();
 }
 const STORE='veldrass-calc-v1';
-const EDITABLE=['cls','level','weapon','petAtk','magic','magicBonus','dmgPct','critChance','critMult','atkSpeed','itemsDef','petDef','petCrit','petCritDmg','petSpeed','petAtkSkill','petDefSkill','shield','shieldBonus','defPct','hunt','huntEff','potionEff','amuletEff','observedKills','xpGlobal','lootRate','fragments','boostMon','boostXp','boostLoot','target','horizon','stock','petLevel','bossN'];
+const EDITABLE=['cls','level','weapon','magic','magicBonus','dmgPct','critChance','critMult','atkSpeed','itemsDef','shield','shieldBonus','defPct','hunt','huntEff','potionEff','amuletEff','observedKills','xpGlobal','lootRate','fragments','boostMon','boostXp','boostLoot','target','horizon','stock','petLevel','petStars','bossN'];
 const BOSS_STR={bossKey:BOSSES,huntFood:FOODS,petRarity:PETS,bossSc:{A:1,B:1},active:{A:1,B:1}};
-function snapshot(){ const o={}; EDITABLE.forEach(k=>o[k]=S[k]); Object.keys(BOSS_STR).forEach(k=>o[k]=S[k]); o.marks=S.A.marks; o.parts=S.parts; o.partsOn=S.partsOn; ['A','B'].forEach(id=>{const s=S[id]; o[id]={atk:s.atk,def:s.def,hp:s.hp,pas:s.pas};}); return o; }
+function snapshot(){ const o={}; EDITABLE.forEach(k=>o[k]=S[k]); Object.keys(BOSS_STR).forEach(k=>o[k]=S[k]); o.petKeys=S.petKeys; o.marks=S.A.marks; o.parts=S.parts; o.partsOn=S.partsOn; ['A','B'].forEach(id=>{const s=S[id]; o[id]={atk:s.atk,def:s.def,hp:s.hp,pas:s.pas};}); return o; }
 function applyState(o){
   if(!o||typeof o!=='object') return;
   if(typeof o.cls==='string'&&CLASSES[o.cls]) S.cls=o.cls;
@@ -264,6 +277,9 @@ function applyState(o){
   ['A','B'].forEach(id=>{ const s=o[id]; if(!s||typeof s!=='object') return;
     ['atk','def','hp','pas'].forEach(k=>{ const n=parseInt(s[k]); if(isFinite(n)&&n>=0&&n<=10000) S[id][k]=n; }); });
   Object.keys(BOSS_STR).forEach(k=>{ if(typeof o[k]==='string'&&Object.prototype.hasOwnProperty.call(BOSS_STR[k],o[k])) S[k]=o[k]; });
+  if(Array.isArray(o.petKeys)) S.petKeys=o.petKeys.filter(k=>typeof k==='string'&&PET_BONUS[k]);
+  S.petStars=Math.max(0,Math.min(5,Math.floor(S.petStars)||0));
+  applyPet();
   S.heal=FOODS[S.huntFood].heal;
   fixTarget();
 }
