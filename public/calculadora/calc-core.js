@@ -35,7 +35,7 @@ const S = {
   itemsDef:175, petDef:28, shield:83, shieldBonus:0, defPct:0,
   hunt:'forgotten_keep', huntEff:17.2, potionEff:0, amuletEff:0, observedKills:191, xpGlobal:0, lootRate:1, fragments:false,
   boostMon:'', boostXp:0, boostLoot:0, target:'throne_key', horizon:8,
-  heal:70, stock:400, obsFoods:0, petRarity:'Uncommon', petLevel:20,
+  heal:70, stock:400, petRarity:'Uncommon', petLevel:20,
   parts:{}, partsOn:{}, // detalhe por equipamento (campo → slot → valor) e quais campos estão abertos
   active:'A', // cenário ativo (o que o jogador usa hoje): base da calibração e das comparações
   A:{atk:0,def:20,hp:24,pas:0,marks:{}},

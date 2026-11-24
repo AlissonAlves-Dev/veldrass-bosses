@@ -18,7 +18,7 @@ const FOODS = {
   cooked_perch:{name:'Perca cozida', heal:70}
 };
 [BOSSES, FOODS].forEach(deepFreeze);
-Object.assign(S, {bossKey:'azrakar_the_abyssal', huntFood:'cooked_perch', obsFood:'cooked_perch', heal:70, bossN:10, bossSc:'A'});
+Object.assign(S, {bossKey:'azrakar_the_abyssal', huntFood:'cooked_perch', heal:70, bossN:10, bossSc:'A'});
 
 // Dano depois da defesa (CombatDefenseService::damageAfterDefense), esperado sobre o sorteio uniforme.
 function bossHitAfterDefense(atk, def){
