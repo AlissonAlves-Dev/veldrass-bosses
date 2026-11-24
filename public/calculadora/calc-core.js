@@ -19,23 +19,51 @@ const CLASSES = {
     passiva:{nome:'Splash mágico',chance:10,tipo:'splash',desc:'Chance de repetir o mesmo dano em todos os outros alvos vivos do encontro.'}}
 };
 function deepFreeze(o){ Object.values(o).forEach(v=>{ if(v&&typeof v==='object') deepFreeze(v); }); return Object.freeze(o); }
-// Pets (config/pets.php): vida = base + nível × por nível. A defesa do pet é o campo "Defesa do pet" (bônus que ele dá ao dono).
-const PETS = {none:{nome:'Sem pet',baseHp:0,hpPerLevel:0,perLevel:0}, Uncommon:{nome:'Incomum',baseHp:80,hpPerLevel:6,perLevel:1.4}, Rare:{nome:'Raro',baseHp:100,hpPerLevel:8,perLevel:1.6},
-  Epic:{nome:'Épico',baseHp:120,hpPerLevel:10,perLevel:1.8}, Legendary:{nome:'Lendário',baseHp:150,hpPerLevel:12,perLevel:2.0}};
-// Ataque e defesa que o pet dá: nível efetivo × valor por nível da raridade (attack_per_level / defense_per_level do config/pets.php).
-const petBaseStats = (rarity, level) => { const p = PETS[rarity]; const v = p ? Math.max(1, Math.round(Math.max(0, level) * p.perLevel)) : 0; return p && p.perLevel > 0 && level > 0 ? {atk: v, def: v} : {atk: 0, def: 0}; };
+// Pets (config/pets.php). Nível efetivo = nível + 10 por estrela. Vida = base + nível efetivo × por nível; defesa do próprio pet = nível efetivo × defesa por nível.
+// Cada bônus que o pet tem vale: nível efetivo × stat_per_level da raridade × multiplicador do bônus (PetService::baseBonuses). Quantos bônus: bonus_count da raridade.
+const PETS = {
+  none:{nome:'Sem pet',baseHp:0,hpPerLevel:0,defPerLevel:0,statPerLevel:0,bonusCount:0},
+  Uncommon:{nome:'Incomum',baseHp:80,hpPerLevel:6,defPerLevel:1.4,statPerLevel:0.10,bonusCount:2},
+  Rare:{nome:'Raro',baseHp:100,hpPerLevel:8,defPerLevel:1.6,statPerLevel:0.15,bonusCount:3},
+  Epic:{nome:'Épico',baseHp:120,hpPerLevel:10,defPerLevel:1.8,statPerLevel:0.20,bonusCount:4},
+  Legendary:{nome:'Lendário',baseHp:150,hpPerLevel:12,defPerLevel:2.0,statPerLevel:0.25,bonusCount:5}
+};
+const PET_BONUS = {
+  attack:{nome:'Ataque',mult:1,field:'petAtk',unit:''},
+  defense:{nome:'Defesa',mult:1,field:'petDef',unit:''},
+  critical_chance_percent:{nome:'Chance de crítico',mult:0.25,field:'petCrit',unit:'%'},
+  critical_damage_percent:{nome:'Dano crítico',mult:1,field:'petCritDmg',unit:'%'},
+  attack_speed_percent:{nome:'Velocidade de ataque',mult:0.25,field:'petSpeed',unit:'%'},
+  attack_skill:{nome:'Skill de ataque',mult:1,field:'petAtkSkill',unit:' níveis'},
+  defense_skill:{nome:'Skill de defesa',mult:1,field:'petDefSkill',unit:' níveis'}
+};
+const petEffLevel = () => Math.max(0, Math.floor(S.petLevel||0)) + Math.max(0, Math.min(5, Math.floor(S.petStars||0))) * 10;
+// Valor de cada bônus escolhido, como o jogo calcula (arredondado em 2 casas).
+function petBonusValues(rarity, effLevel, keys){
+  const p = PETS[rarity], out = {}; if(!p || p.statPerLevel<=0) return out;
+  (keys||[]).forEach(k=>{ const b=PET_BONUS[k]; if(b) out[k]=Math.round(effLevel*p.statPerLevel*b.mult*100)/100; });
+  return out;
+}
+// Guarda em S os bônus do pet que a calculadora usa (ataque, defesa, crítico, velocidade e skills).
+function applyPet(){
+  const p = PETS[S.petRarity]; const max = p ? p.bonusCount : 0;
+  S.petKeys = (S.petKeys||[]).filter(k=>PET_BONUS[k]).slice(0,max);
+  const v = petBonusValues(S.petRarity, petEffLevel(), S.petKeys);
+  Object.entries(PET_BONUS).forEach(([k,b])=>{ S[b.field] = v[k] || 0; });
+}
 const PET_HIT_CHANCE = 0.30; // chance de o pet ser atacado a cada ataque de monstro (BattleSimulationService::applyPetBattleDamage)
 [RULES,CLASSES,DATA,MARK,COST,STAGEXP,PETS].forEach(deepFreeze);
 const CLS = () => CLASSES[S.cls];
 const earned = () => Math.floor(Math.max(1,S.level)/RULES.levelsPerStep)*RULES.pointsPerStep;
 // ---------- estado ----------
 const S = {
-  cls:'wizard', level:111, weapon:231, petAtk:28, magic:83, magicBonus:11, dmgPct:0, critChance:7, critMult:181, atkSpeed:7,
+  cls:'wizard', level:111, weapon:231, petAtk:0, magic:83, magicBonus:11, dmgPct:0, critChance:7, critMult:181, atkSpeed:7,
   petCrit:0, petCritDmg:0, petSpeed:0, petAtkSkill:0, petDefSkill:0,
-  itemsDef:175, petDef:28, shield:83, shieldBonus:0, defPct:0,
+  petRarity:'Legendary', petLevel:62, petStars:5, petKeys:['attack','defense'], // padrão: efetivo 112 → ataque 28 e defesa 28
+  itemsDef:175, petDef:0, shield:83, shieldBonus:0, defPct:0,
   hunt:'forgotten_keep', huntEff:17.2, potionEff:0, amuletEff:0, observedKills:191, xpGlobal:0, lootRate:1, fragments:false,
   boostMon:'', boostXp:0, boostLoot:0, target:'throne_key', horizon:8,
-  heal:70, stock:400, obsFoods:0, petRarity:'Uncommon', petLevel:20,
+  heal:70, stock:400,
   parts:{}, partsOn:{}, // detalhe por equipamento (campo → slot → valor) e quais campos estão abertos
   active:'A', // cenário ativo (o que o jogador usa hoje): base da calibração e das comparações
   A:{atk:0,def:20,hp:24,pas:0,marks:{}},
@@ -46,6 +74,7 @@ function emptyMarks(){ const o={}; monsKeys().forEach(m=>o[m]={dmg:0,xp:0,cc:0,c
 // Marcas do Bestiário: um só conjunto, compartilhado pelos cenários A e B (mesmo objeto).
 function resetMarks(){ const m=emptyMarks(); S.A.marks=m; S.B.marks=m; }
 resetMarks();
+applyPet();
 
 // ---------- simulação ----------
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -104,8 +133,8 @@ function simulate(sc, N=30000){
   const dv=derive(sc), H=DATA.hunts[S.hunt], keys=Object.keys(H.weights), tw=keys.reduce((a,k)=>a+H.weights[k],0);
   const rnd=mulberry32(20261120);
   // Sorteios de defesa e de ataque ao pet usam outra sequência, para não mexer nos resultados de ataque/abates.
-  const rnd2=mulberry32(20261122), C=CLS(), pet=PETS[S.petRarity]||PETS.none, petOn=S.petRarity!=='none'&&S.petLevel>0&&!!PETS[S.petRarity];
-  const petMaxHp=petOn?pet.baseHp+Math.max(1,S.petLevel)*pet.hpPerLevel:0;
+  const rnd2=mulberry32(20261122), C=CLS(), pet=PETS[S.petRarity]||PETS.none, effLv=petEffLevel(), petOn=S.petRarity!=='none'&&effLv>0&&!!PETS[S.petRarity];
+  const petMaxHp=petOn?pet.baseHp+effLv*pet.hpPerLevel:0, petOwnDef=petOn?Math.max(1,Math.round(effLv*pet.defPerLevel)):0;
   const defBy=Object.fromEntries(keys.map(k=>[k,dv.effDefFor(MARK.ds[(sc.marks[k]||{ds:0}).ds||0])]));
   const evP=[], evQ=[]; let dmgSum=0, petDmgSum=0;
   const pick=()=>{let r=rnd()*tw;for(const k of keys){r-=H.weights[k];if(r<0)return k}return keys[keys.length-1]};
@@ -131,14 +160,14 @@ function simulate(sc, N=30000){
         if(C.passiva.tipo==='block'&&rnd2()<dv.passivePct/100) inc=Math.floor(atk*0.5);
         else if(C.passiva.tipo==='dodge'&&rnd2()<dv.passivePct/100) dodged=true;
         if(!dodged){ const d=dmgAfterDef(inc,defBy[m],rnd2()); if(d>0) pdmg+=Math.max(1,Math.ceil(d*C.taken)); }
-        if(petOn&&rnd2()<PET_HIT_CHANCE){ (hits||(hits=[])).push(dmgAfterDef(atk,S.petDef,rnd2())); }
+        if(petOn&&rnd2()<PET_HIT_CHANCE){ (hits||(hits=[])).push(dmgAfterDef(atk,petOwnDef,rnd2())); }
       }
       evP.push(pdmg); evQ.push(hits); dmgSum+=pdmg; if(hits) petDmgSum+=hits.reduce((a,b)=>a+b,0);
     }
     ms.forEach(m=>kills[m]++);
   }
   const A=acts/N, killsPerEnc=Object.fromEntries(keys.map(k=>[k,kills[k]/N]));
-  return {dv, actsPerEnc:A, actSecPerEnc:actSec/N, N, ev:{p:evP,q:evQ}, petMaxHp, dmgPerEnc:dmgSum/N, petDmgPerEnc:petDmgSum/N, attacksPerEnc:attacks/N, attacksBy:Object.fromEntries(keys.map(k=>[k,atkBy[k]/N])), killsPerEnc};
+  return {dv, actsPerEnc:A, actSecPerEnc:actSec/N, N, ev:{p:evP,q:evQ}, petMaxHp, petOwnDef, petEffLv:effLv, dmgPerEnc:dmgSum/N, petDmgPerEnc:petDmgSum/N, attacksPerEnc:attacks/N, attacksBy:Object.fromEntries(keys.map(k=>[k,atkBy[k]/N])), killsPerEnc};
 }
 function metrics(sc, overhead){
   const r=simulate(sc), dv=r.dv, keys=Object.keys(r.killsPerEnc);

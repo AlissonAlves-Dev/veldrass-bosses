@@ -7,7 +7,7 @@ import { runInNewContext } from 'node:vm';
 const read = (file) => readFileSync(new URL('./public/calculadora/' + file, import.meta.url), 'utf8');
 const c = runInNewContext(
   read('data.js') + read('calc-core.js') +
-  ';({ S, CLASSES, RULES, DATA, MARK, derive, simulate, metrics, earned, marksCost, marksWarnings, dmgAfterDef, countFoods, petFoodsOver, PETS });'
+  ';({ S, CLASSES, RULES, DATA, MARK, derive, simulate, metrics, earned, marksCost, marksWarnings, dmgAfterDef, countFoods, petFoodsOver, PETS, PET_BONUS, petBonusValues, petEffLevel, applyPet });'
 );
 
 // Mesma calibração da interface: ajusta a espera extra para o cenário A bater com os abates/h do painel.
@@ -159,9 +159,38 @@ test('simulação: dano recebido e eventos para a comida', () => {
   const r = c.simulate(c.S.A, 2000);
   assert.equal(r.ev.p.length, r.ev.q.length);
   assert.ok(r.dmgPerEnc > 0);
-  assert.ok(r.petMaxHp === c.PETS[c.S.petRarity].baseHp + c.S.petLevel * c.PETS[c.S.petRarity].hpPerLevel);
+  const p = c.PETS[c.S.petRarity];
+  assert.equal(r.petMaxHp, p.baseHp + c.petEffLevel() * p.hpPerLevel);
+  assert.equal(r.petOwnDef, Math.round(c.petEffLevel() * p.defPerLevel));
   // melhor defesa, menos dano
   const antes = r.dmgPerEnc; const def = c.S.itemsDef; c.S.itemsDef = 0;
   const pior = c.simulate(c.S.A, 2000).dmgPerEnc; c.S.itemsDef = def;
   assert.ok(pior > antes);
+});
+
+test('pet: bônus calculados pela raridade, nível, estrelas e tipos escolhidos', () => {
+  // nível efetivo = nível + 10 por estrela
+  Object.assign(c.S, { petRarity: 'Epic', petLevel: 96, petStars: 1, petKeys: ['attack', 'critical_chance_percent', 'defense_skill', 'attack_speed_percent'] });
+  assert.equal(c.petEffLevel(), 106);
+  c.applyPet();
+  assert.equal(c.S.petAtk, 21.2); // 106 × 0,20 × 1
+  assert.equal(c.S.petCrit, 5.3); // 106 × 0,20 × 0,25
+  assert.equal(c.S.petSpeed, 5.3);
+  assert.equal(c.S.petDefSkill, 21.2);
+  assert.equal(c.S.petDef, 0); // bônus que o pet não tem
+  assert.equal(c.S.petCritDmg, 0);
+  // raridade limita a quantidade de bônus (Incomum: 2)
+  Object.assign(c.S, { petRarity: 'Uncommon', petLevel: 20, petStars: 0, petKeys: ['attack', 'defense', 'attack_skill'] });
+  c.applyPet();
+  assert.equal(c.S.petKeys.length, 2);
+  assert.equal(c.S.petAtk, 2);
+  assert.equal(c.S.petAtkSkill, 0);
+  // sem pet: nada de bônus
+  c.S.petRarity = 'none'; c.applyPet();
+  assert.equal(c.S.petAtk + c.S.petDef + c.S.petCrit, 0);
+  // volta ao padrão (Lendário efetivo 112: ataque 28 e defesa 28)
+  Object.assign(c.S, { petRarity: 'Legendary', petLevel: 62, petStars: 5, petKeys: ['attack', 'defense'] });
+  c.applyPet();
+  assert.equal(c.S.petAtk, 28);
+  assert.equal(c.S.petDef, 28);
 });
