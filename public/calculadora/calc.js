@@ -2,11 +2,22 @@
 // ---------- UI ----------
 // Alterna o fundo das linhas visíveis de um bloco (ignora as de detalhe fechadas).
 function stripe(sec){ if(!sec) return; let n=0; sec.querySelectorAll('.row').forEach(r=>{ const hidden=r.closest('[hidden]'); r.classList.toggle('alt',!hidden&&(n%2===1)); if(!hidden) n++; }); }
-function numRow(parent,label,key,step=1,min=0,suffix=''){
+// Bloco recolhido para os campos opcionais (valores padrão já funcionam).
+function advBox(parent,title){
+  const d=document.createElement('details'); d.className='adv';
+  d.innerHTML='<summary>'+title+'</summary><div class="adv-body"></div>';
+  parent.appendChild(d); return d.querySelector('.adv-body');
+}
+// Ao trocar raridade ou nível do pet, o ataque e a defesa que ele dá são recalculados (e continuam editáveis em Avançado).
+function applyPetBase(){
+  const b=petBaseStats(S.petRarity,S.petLevel); S.petAtk=b.atk; S.petDef=b.def;
+  ['petAtk','petDef'].forEach(k=>{ const i=document.querySelector('input[data-key="'+k+'"]'); if(i) i.value=S[k]; });
+}
+function numRow(parent,label,key,step=1,min=0,suffix='',onChange=null){
   const row=document.createElement('div'); row.className='row';
   row.innerHTML=`<label>${label}</label>`;
-  const i=document.createElement('input'); i.type='number'; i.step=step; i.min=min; i.value=S[key];
-  i.oninput=()=>{ S[key]=parseFloat(i.value)||0; schedule(); };
+  const i=document.createElement('input'); i.type='number'; i.step=step; i.min=min; i.value=S[key]; i.dataset.key=key;
+  i.oninput=()=>{ S[key]=parseFloat(i.value)||0; if(onChange) onChange(); schedule(); };
   row.appendChild(i); parent.appendChild(row);
 }
 // Campos que são a soma de vários equipamentos: clicar no nome abre um valor por equipamento e o total é somado.
@@ -38,19 +49,22 @@ function buildChar(){
   sel.onchange=()=>{ S.cls=sel.value; buildChar(); buildScenarios(); render(); };
   r.appendChild(sel); el.appendChild(r);
   const card=document.createElement('div'); card.id='classcard'; el.appendChild(card);
-  const h=document.createElement('p'); h.className='hint'; h.style.margin='12px 0 14px'; h.textContent='Campos abaixo do card são do seu personagem (editáveis). Os modificadores da classe, marcados com cadeado, são fixos do jogo. Ao trocar de classe, ajuste arma, skills e defesa. Nos campos com ▸, clique no nome para digitar o valor de cada equipamento; o total é somado sozinho.'; el.appendChild(h);
+  const h=document.createElement('p'); h.className='hint'; h.style.margin='12px 0 14px'; h.textContent='Preencha os campos abaixo com os dados do seu personagem. Os modificadores da classe (cadeado) são fixos do jogo. Em "Avançado" ficam os bônus opcionais; nos campos com ▸, clique no nome para digitar o valor de cada equipamento.'; el.appendChild(h);
   const c=CLS();
-  const rows=a=>(PARTS[a[1]]?numRowParts:numRow)(el,a[0],a[1],a[2]||1,a[3]!==undefined?a[3]:0);
-  [['Nível do personagem','level',1,1],['Ataque da arma (já com aprimoramento)','weapon'],['Nível de '+c.skill,'magic'],['Bônus de skill de '+c.skill+' (itens)','magicBonus'],
-   ['Dano % extra (encantos)','dmgPct'],['Chance de crítico %','critChance',0.1],['Dano crítico % (como no painel)','critMult'],
-   ['Velocidade de ataque %','atkSpeed',0.5],['Defesa dos itens (sem pontos/pet)','itemsDef'],['Nível de Escudo','shield']
-  ].forEach(rows);
-  const sep=document.createElement('div'); sep.className='pet-sep'; sep.innerHTML='<span>Pet equipado (bônus do pet)</span>'; el.appendChild(sep);
-  selRow(el,'Raridade do pet','petRarity',Object.entries(PETS).map(([k,p])=>[k,p.nome]));
-  numRow(el,'Nível efetivo do pet (nível + 10 por estrela)','petLevel');
-  [['Ataque do pet','petAtk'],['Defesa do pet','petDef'],['Chance de crítico do pet %','petCrit',0.1],['Dano crítico do pet %','petCritDmg',0.1],
+  const rowsIn=box=>a=>(PARTS[a[1]]?numRowParts:numRow)(box,a[0],a[1],a[2]||1,a[3]!==undefined?a[3]:0);
+  [['Nível do personagem','level',1,1],['Ataque da arma (já com aprimoramento)','weapon'],['Nível de '+c.skill,'magic'],
+   ['Defesa dos itens (sem pontos/pet)','itemsDef'],['Nível de Escudo','shield']
+  ].forEach(rowsIn(el));
+  [['Bônus de skill de '+c.skill+' (itens)','magicBonus'],['Dano % extra (encantos)','dmgPct'],['Chance de crítico %','critChance',0.1],
+   ['Dano crítico % (como no painel)','critMult'],['Velocidade de ataque %','atkSpeed',0.5]
+  ].forEach(rowsIn(advBox(el,'Avançado: bônus e crítico do personagem')));
+  const sep=document.createElement('div'); sep.className='pet-sep'; sep.innerHTML='<span>Pet equipado</span>'; el.appendChild(sep);
+  selRow(el,'Raridade do pet','petRarity',Object.entries(PETS).map(([k,p])=>[k,p.nome]),applyPetBase);
+  numRow(el,'Nível efetivo do pet (nível + 10 por estrela)','petLevel',1,0,'',applyPetBase);
+  [['Ataque do pet (automático pela raridade e nível)','petAtk'],['Defesa do pet (automática pela raridade e nível)','petDef'],['Chance de crítico do pet %','petCrit',0.1],['Dano crítico do pet %','petCritDmg',0.1],
    ['Velocidade de ataque do pet %','petSpeed',0.1],['Skill de ataque do pet (níveis)','petAtkSkill'],['Skill de defesa do pet (níveis)','petDefSkill']
-  ].forEach(rows); stripe(el);
+  ].forEach(rowsIn(advBox(el,'Avançado: bônus do pet')));
+  stripe(el);
 }
 const SHOW_ELITE=false; // classe elite ainda não existe no jogo; mude para true quando for lançada
 function renderClassCard(a,b){
@@ -82,23 +96,24 @@ function buildHunt(){
   Object.keys(DATA.hunts).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=HUNTNAMES[k]||DATA.hunts[k].name;sel.appendChild(o)});
   sel.value=S.hunt; sel.onchange=()=>{S.hunt=sel.value; resetMarks(); S.boostMon=''; fixTarget(); buildHunt(); buildScenarios(); schedule();};
   r.style.gridTemplateColumns='1fr 1fr'; r.appendChild(sel); el.appendChild(r);
-  [['Eficiência de Caça % (skill)','huntEff',0.1],['+ poção de batalha %','potionEff'],['+ amuleto/outros %','amuletEff'],['Abates/h observados (calibra o ciclo)','observedKills'],
-   ['Bônus global de XP % (poção etc.)','xpGlobal'],['Taxa de loot (1 = normal)','lootRate',0.1]].forEach(a=>numRow(el,a[0],a[1],a[2]||1));
-  // monstro do dia
-  const b=document.createElement('div'); b.className='row'; b.style.gridTemplateColumns='1fr 1fr'; b.innerHTML='<label>Monstro do dia (boost)</label>';
-  const bs=document.createElement('select'); bs.innerHTML='<option value="">— nenhum —</option>'+monsKeys().map(k=>`<option value="${k}">${nm(k)}</option>`).join('');
-  bs.value=S.boostMon; bs.onchange=()=>{S.boostMon=bs.value;schedule()}; b.appendChild(bs); el.appendChild(b);
-  numRow(el,'Boost: XP % (5–10)','boostXp'); numRow(el,'Boost: loot % (10–20)','boostLoot');
+  numRow(el,'Eficiência de Caça % (skill)','huntEff',0.1);
   // item alvo
   const drops=new Set(); monsKeys().forEach(m=>DATA.monsters[m].drops.forEach(d=>drops.add(d.key)));
   const t=document.createElement('div'); t.className='row'; t.style.gridTemplateColumns='1fr 1fr'; t.innerHTML='<label>Item alvo (ex.: chave)</label>';
   const ts=document.createElement('select'); ts.innerHTML=[...drops].map(k=>`<option value="${k}">${inm(k)}</option>`).join(''); ts.value=S.target; ts.onchange=()=>{S.target=ts.value;schedule()}; t.appendChild(ts); el.appendChild(t);
-  numRow(el,'Tempo de caçada para a chance do item (h)','horizon');
-  const f=document.createElement('div'); f.className='row'; f.style.gridTemplateColumns='1fr auto';
-  f.innerHTML='<label>Contar fragmentos de fusão no ouro/h (loteria)</label>'; const c=document.createElement('input'); c.type='checkbox'; c.checked=S.fragments; c.style.width='auto'; c.onchange=()=>{S.fragments=c.checked;schedule()}; f.appendChild(c); el.appendChild(f);
   selRow(el,'Comida que você usa (caçada e boss)','huntFood',Object.entries(FOODS).map(([k,f])=>[k,f.name+' (cura '+f.heal+')']),()=>{ S.heal=FOODS[S.huntFood].heal; });
-  [['Estoque de comida','stock'],['Comidas/h que você gasta (opcional: ajusta a estimativa; 0 = só o modelo)','obsFoods']].forEach(a=>numRow(el,a[0],a[1]));
-  selRow(el,'Comida que você usava ao medir as comidas/h','obsFood',Object.entries(FOODS).map(([k,f])=>[k,f.name+' (cura '+f.heal+')']));
+  const adv=advBox(el,'Avançado: bônus, boost do dia e calibração');
+  [['+ poção de batalha %','potionEff'],['+ amuleto/outros %','amuletEff'],['Abates/h observados (calibra o ciclo)','observedKills'],
+   ['Bônus global de XP % (poção etc.)','xpGlobal'],['Taxa de loot (1 = normal)','lootRate',0.1]].forEach(a=>numRow(adv,a[0],a[1],a[2]||1));
+  // monstro do dia
+  const b=document.createElement('div'); b.className='row'; b.style.gridTemplateColumns='1fr 1fr'; b.innerHTML='<label>Monstro do dia (boost)</label>';
+  const bs=document.createElement('select'); bs.innerHTML='<option value="">— nenhum —</option>'+monsKeys().map(k=>`<option value="${k}">${nm(k)}</option>`).join('');
+  bs.value=S.boostMon; bs.onchange=()=>{S.boostMon=bs.value;schedule()}; b.appendChild(bs); adv.appendChild(b);
+  numRow(adv,'Boost: XP % (5–10)','boostXp'); numRow(adv,'Boost: loot % (10–20)','boostLoot');
+  const f=document.createElement('div'); f.className='row'; f.style.gridTemplateColumns='1fr auto';
+  f.innerHTML='<label>Contar fragmentos de fusão no ouro/h (loteria)</label>'; const c=document.createElement('input'); c.type='checkbox'; c.checked=S.fragments; c.style.width='auto'; c.onchange=()=>{S.fragments=c.checked;schedule()}; f.appendChild(c); adv.appendChild(f);
+  [['Estoque de comida','stock'],['Comidas/h que você gasta (opcional: ajusta a estimativa; 0 = só o modelo)','obsFoods']].forEach(a=>numRow(adv,a[0],a[1]));
+  selRow(adv,'Comida que você usava ao medir as comidas/h','obsFood',Object.entries(FOODS).map(([k,f])=>[k,f.name+' (cura '+f.heal+')']));
   const h=document.createElement('p'); h.className='hint'; h.textContent='Espera entre encontros = 30 s × (1 − eficiência), arredondada para cima. Caçada máxima: 8 h.'; el.appendChild(h); stripe(el);
 }
 function fixTarget(){ const drops=new Set(); monsKeys().forEach(m=>DATA.monsters[m].drops.forEach(d=>drops.add(d.key))); if(!drops.has(S.target)) S.target=[...drops].find(k=>/key/.test(k))||[...drops][0]; }
@@ -119,9 +134,9 @@ function buildScenario(id){
   updatePts(id); /* atributos: todas as linhas com a mesma cor (sem listras alternadas) */
 }
 function buildMarks(){
-  const el=document.getElementById('marksbox'); if(!el) return; el.innerHTML='<h2>Marcas do Bestiário (nível 0–3) e etapa</h2>';
+  const el=document.getElementById('marksbox'); if(!el) return; el.innerHTML='<details class="adv adv-section"><summary><h2>Marcas do Bestiário (opcional)</h2></summary><div class="adv-body"></div></details>'; const body=el.querySelector('.adv-body');
   const sc=S.A; // as marcas são as mesmas nos cenários A e B (S.A.marks === S.B.marks)
-  const pts=document.createElement('div'); pts.className='pts'; pts.id='marksinfo'; el.appendChild(pts);
+  const pts=document.createElement('div'); pts.className='pts'; pts.id='marksinfo'; body.appendChild(pts);
   const t=document.createElement('table'); t.className='mark';
   const HEAD={dmg:'Dano',xp:'XP',cc:'Crít.',cd:'D.crít.',ds:'Defesa',sp:'Vel. atq.'};
   t.innerHTML='<tr><th>Monstro</th>'+MARK_TYPES.map(ty=>`<th>${HEAD[ty]}<small class="th-sub">+${MARK[ty].slice(1).join(' / ').replaceAll('.',',')}%</small></th>`).join('')+'<th>Etapa</th></tr>';
@@ -136,9 +151,9 @@ function buildMarks(){
     s.innerHTML=STAGEXP.map((v,i)=>`<option value="${i}">${i}${v?` (+${v}% XP)`:''}</option>`).join(''); s.value=sc.marks[m].stage; s.onchange=()=>{sc.marks[m].stage=+s.value;schedule()}; td.appendChild(s); tr.appendChild(td);
     t.appendChild(tr);
   });
-  el.appendChild(t);
-  const w=document.createElement('div'); w.id='markswarn'; el.appendChild(w);
-  const hh=document.createElement('p'); hh.className='hint'; hh.textContent='Etapa do Bestiário: bônus de XP por espécie (2/3/4/5%) conforme os abates. Máx. 2 marcas por monstro; cada marca (tipo+nível) fica em um monstro só; tirar marca de Elite custa 30 mil de ouro. As marcas valem para os cenários A e B.'; el.appendChild(hh);
+  body.appendChild(t);
+  const w=document.createElement('div'); w.id='markswarn'; body.appendChild(w);
+  const hh=document.createElement('p'); hh.className='hint'; hh.textContent='Etapa do Bestiário: bônus de XP por espécie (2/3/4/5%) conforme os abates. Máx. 2 marcas por monstro; cada marca (tipo+nível) fica em um monstro só; tirar marca de Elite custa 30 mil de ouro. As marcas valem para os cenários A e B.'; body.appendChild(hh);
   updateMarks();
 }
 function updateMarks(){

@@ -20,8 +20,10 @@ const CLASSES = {
 };
 function deepFreeze(o){ Object.values(o).forEach(v=>{ if(v&&typeof v==='object') deepFreeze(v); }); return Object.freeze(o); }
 // Pets (config/pets.php): vida = base + nível × por nível. A defesa do pet é o campo "Defesa do pet" (bônus que ele dá ao dono).
-const PETS = {none:{nome:'Sem pet',baseHp:0,hpPerLevel:0}, Uncommon:{nome:'Incomum',baseHp:80,hpPerLevel:6}, Rare:{nome:'Raro',baseHp:100,hpPerLevel:8},
-  Epic:{nome:'Épico',baseHp:120,hpPerLevel:10}, Legendary:{nome:'Lendário',baseHp:150,hpPerLevel:12}};
+const PETS = {none:{nome:'Sem pet',baseHp:0,hpPerLevel:0,perLevel:0}, Uncommon:{nome:'Incomum',baseHp:80,hpPerLevel:6,perLevel:1.4}, Rare:{nome:'Raro',baseHp:100,hpPerLevel:8,perLevel:1.6},
+  Epic:{nome:'Épico',baseHp:120,hpPerLevel:10,perLevel:1.8}, Legendary:{nome:'Lendário',baseHp:150,hpPerLevel:12,perLevel:2.0}};
+// Ataque e defesa que o pet dá: nível efetivo × valor por nível da raridade (attack_per_level / defense_per_level do config/pets.php).
+const petBaseStats = (rarity, level) => { const p = PETS[rarity]; const v = p ? Math.max(1, Math.round(Math.max(0, level) * p.perLevel)) : 0; return p && p.perLevel > 0 && level > 0 ? {atk: v, def: v} : {atk: 0, def: 0}; };
 const PET_HIT_CHANCE = 0.30; // chance de o pet ser atacado a cada ataque de monstro (BattleSimulationService::applyPetBattleDamage)
 [RULES,CLASSES,DATA,MARK,COST,STAGEXP,PETS].forEach(deepFreeze);
 const CLS = () => CLASSES[S.cls];
