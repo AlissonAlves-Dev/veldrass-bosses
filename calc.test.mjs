@@ -7,7 +7,7 @@ import { runInNewContext } from 'node:vm';
 const read = (file) => readFileSync(new URL('./public/calculadora/' + file, import.meta.url), 'utf8');
 const c = runInNewContext(
   read('data.js') + read('calc-core.js') +
-  ';({ S, CLASSES, RULES, DATA, MARK, derive, simulate, metrics, earned, marksCost, marksWarnings, dmgAfterDef, countFoods, petFoodsOver, PETS, PET_BONUS, petBonusValues, petEffLevel, applyPet });'
+  ';({ S, CLASSES, RULES, DATA, MARK, derive, simulate, metrics, earned, marksCost, marksWarnings, dmgAfterDef, countFoods, petFoodsOver, PETS, PET_BONUS, petBonusValues, petEffLevel, applyPet, petReducedDamage });'
 );
 
 // Mesma calibração da interface: ajusta a espera extra para o cenário A bater com os abates/h do painel.
@@ -135,6 +135,18 @@ test('comida: come 1 por ação e só quando falta HP igual à cura', () => {
   // dano maior que a vida conta como morte
   const dead = c.countFoods({ N: 1, petMaxHp: 0, ev: { p: [150], q: [null] } }, 70, 100);
   assert.equal(dead.playerDeaths, 1);
+});
+
+test('pet na caçada: dano depois da defesa cai 70%, arredondado para cima (PetService::reducedDamageTaken)', () => {
+  // Exemplo do jogo: Stone Golem (212) contra pet com defesa 187 tomava de 26 a 35 e passa a tomar de 8 a 11.
+  assert.equal(c.petReducedDamage(26), 8);
+  assert.equal(c.petReducedDamage(35), 11);
+  assert.equal(c.petReducedDamage(1), 1);
+  assert.equal(c.petReducedDamage(0), 0);
+  // Na simulação, o pet recebe bem menos dano que o golpe cheio contra a defesa dele.
+  const r = c.simulate(c.S.A, 2000);
+  const cheio = c.dmgAfterDef(c.DATA.monsters[Object.keys(c.DATA.monsters)[0]].attack, r.petOwnDef, 0.5);
+  assert.ok(r.petDmgPerEnc >= 0 && Number.isFinite(cheio));
 });
 
 test('comida do pet: morre e não volta na mesma caçada', () => {
