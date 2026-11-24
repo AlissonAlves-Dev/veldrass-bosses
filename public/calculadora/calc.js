@@ -116,7 +116,7 @@ function buildHunt(){
   const ts=document.createElement('select'); ts.innerHTML=[...drops].map(k=>`<option value="${k}">${inm(k)}</option>`).join(''); ts.value=S.target; ts.onchange=()=>{S.target=ts.value;schedule()}; t.appendChild(ts); el.appendChild(t);
   selRow(el,'Comida que você usa (caçada e boss)','huntFood',Object.entries(FOODS).map(([k,f])=>[k,f.name+' (cura '+f.heal+')']),()=>{ S.heal=FOODS[S.huntFood].heal; });
   const adv=advBox(el,'Avançado: bônus, boost do dia e estoque');
-  [['+ poção de batalha %','potionEff'],['+ amuleto/outros %','amuletEff'],['Abates/h observados (calibra o ciclo)','observedKills'],
+  [['+ poção de batalha %','potionEff'],['+ amuleto/outros %','amuletEff'],
    ['Bônus global de XP % (poção etc.)','xpGlobal'],['Taxa de loot (1 = normal)','lootRate',0.1]].forEach(a=>numRow(adv,a[0],a[1],a[2]||1));
   // monstro do dia
   const b=document.createElement('div'); b.className='row'; b.style.gridTemplateColumns='1fr 1fr'; b.innerHTML='<label>Monstro do dia (boost)</label>';
@@ -184,12 +184,10 @@ function buildScenarios(){ buildScenario('A'); buildScenario('B'); buildMarks();
 let timer=null; function schedule(){ clearTimeout(timer); timer=setTimeout(render,60); }
 function delta(a,b,inv=false){ if(!isFinite(a)||a===0) return '<td class="d">—</td>'; const d=(b-a)/a*100; const good=inv?d<0:d>0; const cls=Math.abs(d)<0.05?'':(good?'pos':'neg'); return `<td class="d ${cls}">${d>0?'+':''}${fmt(d,1)}%</td>`; }
 function render(){
-  // calibração: overhead pelo cenário ativo
   updatePts('A'); updatePts('B');
   const act=S.active, oth=act==='A'?'B':'A';
-  const dvA=derive(S[act]), rA=simulate(S[act]); renderClassCard(derive(S.A), derive(S.B));
-  let overhead=0;
-  if(S.observedKills>0){ const kpe=Object.values(rA.killsPerEnc).reduce((a,b)=>a+b,0); overhead=3600/(S.observedKills/kpe)-dvA.wait-rA.actSecPerEnc; }
+  renderClassCard(derive(S.A), derive(S.B));
+  const overhead=RULES.cycleOverheadSec;
   const A=metrics(S.A,overhead), B=metrics(S.B,overhead);
   // Comida: golpes sorteados na simulação (defesa, passiva, marcas) e regra de comer do jogo; o pet gasta comida até morrer.
   const M={A,B}, H=RULES.maxHuntHours;
@@ -236,7 +234,7 @@ function render(){
   h+='<h3>Defesa efetiva vs. ataque dos monstros (com a marca de defesa de cada um)</h3><table><tr><th>Monstro</th><th>Ataque</th><th>A: def '+fmt(A.dv.effDef)+'</th><th>B: def '+fmt(B.dv.effDef)+'</th></tr>';
   const reg=(def,atk)=>{ if(def>=2*atk) return `<span class="good">0–1 por golpe</span>`; if(def<atk) return `<span class="warn">pesado (~${fmt(Math.ceil((atk-def*0.975)*CLS().taken))}/golpe)</span>`; const leak=Math.ceil(0.05*atk)*(2*atk-def)/atk; return `vazamento ~${fmt(Math.ceil(leak*CLS().taken))}/golpe`; };
   monsKeys().forEach(m=>{ const a=DATA.monsters[m].attack, ds=MARK.ds[S.A.marks[m].ds]; h+=`<tr><td>${nm(m)}</td><td>${a}</td><td>${reg(A.dv.effDefFor(ds),a)}</td><td>${reg(B.dv.effDefFor(ds),a)}</td></tr>`; });
-  h+='</table><p class="hint">Calibração: espera extra por ciclo (latência, preparo) = '+fmt(overhead,1)+' s, ajustada para o cenário ativo ('+act+') bater com os seus '+fmt(S.observedKills)+' abates/h. Comidas: cada ataque de monstro é sorteado com a defesa efetiva, a passiva e o "dano recebido" da classe; o jogador come 1 comida por ação, só quando falta HP igual à cura. Não entram regeneração, veneno nem comida de outros tipos.</p>';
+  h+='</table><p class="hint">Espera extra por ciclo (latência e preparo) = '+fmt(overhead,1)+' s, fixa (medida num painel real de Mago nível 111, com 191 abates/h). Comidas: cada ataque de monstro é sorteado com a defesa efetiva, a passiva e o "dano recebido" da classe; o jogador come 1 comida por ação, só quando falta HP igual à cura. Não entram regeneração, veneno nem comida de outros tipos.</p>';
   document.querySelector('#results').innerHTML='<h2>Resultado</h2>'+h;
   // golpes para matar
   let g='<table><tr><th>Monstro</th><th>HP</th><th>Peso</th><th>A: golpes</th><th>A: falta p/ −1 golpe</th><th>B: golpes</th><th>B: falta p/ −1 golpe</th></tr>';
@@ -253,7 +251,7 @@ function render(){
   document.querySelector('#hits').innerHTML='<h2>Golpes para matar cada monstro</h2>'+g; renderBoss(); saveState();
 }
 const STORE='veldrass-calc-v1';
-const EDITABLE=['cls','level','weapon','magic','magicBonus','dmgPct','critChance','critMult','atkSpeed','itemsDef','shield','shieldBonus','defPct','hunt','huntEff','potionEff','amuletEff','observedKills','xpGlobal','lootRate','fragments','boostMon','boostXp','boostLoot','target','horizon','stock','petLevel','petStars','bossN'];
+const EDITABLE=['cls','level','weapon','magic','magicBonus','dmgPct','critChance','critMult','atkSpeed','itemsDef','shield','shieldBonus','defPct','hunt','huntEff','potionEff','amuletEff','xpGlobal','lootRate','fragments','boostMon','boostXp','boostLoot','target','horizon','stock','petLevel','petStars','bossN'];
 const BOSS_STR={bossKey:BOSSES,huntFood:FOODS,petRarity:PETS,bossSc:{A:1,B:1},active:{A:1,B:1}};
 function snapshot(){ const o={}; EDITABLE.forEach(k=>o[k]=S[k]); Object.keys(BOSS_STR).forEach(k=>o[k]=S[k]); o.petKeys=S.petKeys; o.marks=S.A.marks; o.parts=S.parts; o.partsOn=S.partsOn; ['A','B'].forEach(id=>{const s=S[id]; o[id]={atk:s.atk,def:s.def,hp:s.hp,pas:s.pas};}); return o; }
 function applyState(o){

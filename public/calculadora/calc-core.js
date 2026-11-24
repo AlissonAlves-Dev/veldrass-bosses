@@ -9,7 +9,8 @@ const fmt = (n,d=0)=> isFinite(n)? n.toLocaleString('pt-BR',{minimumFractionDigi
 
 // ---------- regras e classes FIXAS (config/game.php) — congeladas, sem campo de edição ----------
 const RULES = {hit:0.95, skillPerLevel:0.015, actionBaseMs:1500, actionMinMs:1000, searchBaseSec:30, maxEfficiency:90, hpPerPoint:10, passivePerPoint:0.1,
-  levelsPerStep:5, pointsPerStep:2, maxHuntHours:8, encounterMin:1, encounterMax:3, maxMarksPerMonster:2, removeEliteGold:30000};
+  levelsPerStep:5, pointsPerStep:2, maxHuntHours:8, cycleOverheadSec:1.6, // espera extra por ciclo (latência e preparo): medida num painel real de Mago nível 111 com 191 abates/h
+   encounterMin:1, encounterMax:3, maxMarksPerMonster:2, removeEliteGold:30000};
 const CLASSES = {
   warrior:{nome:'Guerreiro',elite:'Cavaleiro',eff:1.0,taken:1.0,hpBase:90,hpLvl:12,skill:'Espada',skillMod:1.10,arma:'Espada + escudo',
     passiva:{nome:'Bloqueio',chance:8,tipo:'block',desc:'Com escudo equipado, bloqueia 50% do dano de um golpe.'}},
@@ -61,7 +62,7 @@ const S = {
   petCrit:0, petCritDmg:0, petSpeed:0, petAtkSkill:0, petDefSkill:0,
   petRarity:'Legendary', petLevel:62, petStars:5, petKeys:['attack','defense'], // padrão: efetivo 112 → ataque 28 e defesa 28
   itemsDef:175, petDef:0, shield:83, shieldBonus:0, defPct:0,
-  hunt:'forgotten_keep', huntEff:17.2, potionEff:0, amuletEff:0, observedKills:191, xpGlobal:0, lootRate:1, fragments:false,
+  hunt:'forgotten_keep', huntEff:17.2, potionEff:0, amuletEff:0, xpGlobal:0, lootRate:1, fragments:false,
   boostMon:'', boostXp:0, boostLoot:0, target:'throne_key', horizon:8,
   heal:70, stock:400,
   parts:{}, partsOn:{}, // detalhe por equipamento (campo → slot → valor) e quais campos estão abertos
