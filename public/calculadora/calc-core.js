@@ -53,6 +53,9 @@ function applyPet(){
   Object.entries(PET_BONUS).forEach(([k,b])=>{ S[b.field] = v[k] || 0; });
 }
 const PET_HIT_CHANCE = 0.30; // chance de o pet ser atacado a cada ataque de monstro (BattleSimulationService::applyPetBattleDamage)
+// Na caçada o dano que o pet leva, depois da defesa dele, cai 70% (pets.damage_reduction_percent; PetService::reducedDamageTaken, arredonda para cima). Vale desde 2026-11-23.
+const PET_DAMAGE_REDUCTION_PERCENT = 70;
+const petReducedDamage = d => Math.max(0, Math.ceil(Math.max(0, d) * (100 - PET_DAMAGE_REDUCTION_PERCENT) / 100));
 [RULES,CLASSES,DATA,MARK,COST,STAGEXP,PETS].forEach(deepFreeze);
 const CLS = () => CLASSES[S.cls];
 const earned = () => Math.floor(Math.max(1,S.level)/RULES.levelsPerStep)*RULES.pointsPerStep;
@@ -161,7 +164,7 @@ function simulate(sc, N=30000){
         if(C.passiva.tipo==='block'&&rnd2()<dv.passivePct/100) inc=Math.floor(atk*0.5);
         else if(C.passiva.tipo==='dodge'&&rnd2()<dv.passivePct/100) dodged=true;
         if(!dodged){ const d=dmgAfterDef(inc,defBy[m],rnd2()); if(d>0) pdmg+=Math.max(1,Math.ceil(d*C.taken)); }
-        if(petOn&&rnd2()<PET_HIT_CHANCE){ (hits||(hits=[])).push(dmgAfterDef(atk,petOwnDef,rnd2())); }
+        if(petOn&&rnd2()<PET_HIT_CHANCE){ (hits||(hits=[])).push(petReducedDamage(dmgAfterDef(atk,petOwnDef,rnd2()))); }
       }
       evP.push(pdmg); evQ.push(hits); dmgSum+=pdmg; if(hits) petDmgSum+=hits.reduce((a,b)=>a+b,0);
     }
