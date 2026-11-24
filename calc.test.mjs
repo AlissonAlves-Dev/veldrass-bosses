@@ -11,12 +11,8 @@ const c = runInNewContext(
 );
 
 // Mesma calibração da interface: ajusta a espera extra para o cenário A bater com os abates/h do painel.
-function overheadFor() {
-  const dv = c.derive(c.S.A);
-  const r = c.simulate(c.S.A);
-  const killsPerEnc = Object.values(r.killsPerEnc).reduce((a, b) => a + b, 0);
-  return 3600 / (c.S.observedKills / killsPerEnc) - dv.wait - r.actSecPerEnc;
-}
+// Espera extra fixa por ciclo (a calculadora não calibra mais pelo cenário ativo).
+const overheadFor = () => c.RULES.cycleOverheadSec;
 
 test('dados: 8 caçadas e monstros conferem com o config/game.php', () => {
   assert.equal(Object.keys(c.DATA.hunts).length, 8);
@@ -49,7 +45,7 @@ test('Mago nível 111: dano, HP e defesa batem com o painel do jogo', () => {
   assert.equal(b.maxHp, 940);
 });
 
-test('calibração: reproduz o painel real (XP/h e ouro/h) com folga de 2%', () => {
+test('espera fixa: reproduz o painel real (abates, XP/h e ouro/h) com folga de 2%', () => {
   const overhead = overheadFor();
   const a = c.metrics(c.S.A, overhead);
   assert.ok(Math.abs(a.killsH - 191) < 2, 'abates/h ' + a.killsH);
@@ -193,4 +189,13 @@ test('pet: bônus calculados pela raridade, nível, estrelas e tipos escolhidos'
   c.applyPet();
   assert.equal(c.S.petAtk, 28);
   assert.equal(c.S.petDef, 28);
+});
+
+test('sem calibração: melhorar o combate aumenta abates, XP e ouro por hora do cenário ativo', () => {
+  const base = c.metrics(c.S.A, c.RULES.cycleOverheadSec);
+  const vel = c.S.atkSpeed; c.S.atkSpeed = vel + 20;
+  const rapido = c.metrics(c.S.A, c.RULES.cycleOverheadSec);
+  c.S.atkSpeed = vel;
+  assert.ok(rapido.killsH > base.killsH, 'abates/h ' + base.killsH + ' -> ' + rapido.killsH);
+  assert.ok(rapido.xpH > base.xpH && rapido.totalGoldH > base.totalGoldH);
 });
